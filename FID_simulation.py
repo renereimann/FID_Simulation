@@ -24,20 +24,20 @@ mu_p = 1.41060679736e-26 # J/T # proton magnetic moment
 gamma_p = 2.6752218744e8 # 1/s/T # gyromagnetic ratio of proton (the spin sample particles)
 
 # Geometry - Fixed Probe
-probe_total_length = 100.00 #mm
-probe_total_diameter = 8.00 #mm
-coil_diameter = 2.3 #mm
-coil_length = 15.0 #mm
+probe_total_length = 100.00e-3 #m
+probe_total_diameter = 8.00e-3 #m
+coil_diameter = 2*2.3e-3 # m
+coil_length = 15.0e-3 #m
 coil_turns = 30
-cell_length = 30.0 #mm
-cell_diameter = 1.5 #mm
+cell_length = 30.0e-3 #m
+cell_diameter = 1.5e-3 #m
 
 # Probe Material
 # values from wolframalpha.com "petrolium jelly"
 probe_material_name = "Petroleum Jelly"
 probe_material_formula = "C40H46N4O10"
 molar_mass = 742.8 # g/mol
-density = 0.848 # g/cm^3
+density = 0.848*1e-6 # g/m^3
 T2 = 40*1e-3     # sec
 
 # magnetic field
@@ -45,7 +45,7 @@ B0 = 1.45            # T, static field strength
 T = 273.15 + 26.85   # K
 I = 0.8 # A
 # B1, RF field strength, will be calculated below
-# f_NMR = 61.79 # MHz, circuit of the probe tuned for this value
+omega_NMR = 61.79e6 # Hz, circuit of the probe tuned for this value
 # impedance = 50 # Ohm
 
 # simulation
@@ -113,15 +113,12 @@ B1_x = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand
 B1_y = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_y(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
 B1_z = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_z(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
 
-if True:
+if False:
     # make a plot for comparison
     cross_check = np.genfromtxt("./RF_coil_field_cross_check.txt", delimiter=", ")
-    zs = np.linspace(-15, 15, 1000)
+    zs = np.linspace(-15e-3, 15e-3, 1000)
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="Cross-Check from DocDB 16856, Slide 5\n$\O=2.3\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="orange")
-    B1_z0 = B1_z(0, 0, 0)
-    plt.plot(zs, [B1_z(0, 0, z)/B1_z0 for z in zs], label="My calculation\n$\O=2.3\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k")
-    coil_diameter = 2*2.3 # mm
     B1_z0 = B1_z(0, 0, 0)
     plt.plot(zs, [B1_z(0, 0, z)/B1_z0 for z in zs], label="My calculation\n$\O=4.6\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k", ls=":")
     plt.xlabel("z / mm")
@@ -136,25 +133,104 @@ if True:
 # apply RF field
 # B1 field strength of RF field
 # for time of t_pi2 = pi/(2 gamma B1)
-'''
-t_90 = np.pi/(2*gamma*B1)
+
+BRF = lambda x, y, z: np.sqrt(B1_x(x, y, z)**2 + B1_x(x, y, z)**2 + B1_x(x, y, z)**2)
+B0_xyz = lambda x, y, z, t: B0
+
+B_tot_x = lambda t: BRF*np.cos(omega_NMR*t)
+B_tot_y = lambda t: BRF*np.sin(omega_NMR*t)
+B_tot_z = B0
+
+t_90 = np.pi/(2*gamma_p*BRF(0,0,0)) #BRF(0,0,0)
+print(BRF(0,0,0))
+print(gamma_p)
+print("%.2e"%t_90)
+t_90 = 40.0e-6 # sec
+print(t_90)
 
 # spin
-mu_x(vec(r),t) = np.sin(gamma*B1(vec(r))*t)*np.cos(gamma*B0(vec(r))*t)
-mu_y(vec(r),t) = np.cos(gamma*B1(vec(r))*t)
-mu_z(vec(r),t) = np.sin(gamma*B1(vec(r))*t)*np.sin(gamma*B0(vec(r))*t)
+# aproximation
+mu_x = lambda x, y, z: np.sin(gamma_p*BRF(x,y,z)/2.*t_90)*np.cos(gamma_p*B0*t_90)
+mu_y = lambda x, y, z: np.cos(gamma_p*BRF(x,y,z)/2.*t_90)
+mu_z = lambda x, y, z: np.sin(gamma_p*BRF(x,y,z)/2.*t_90)*np.sin(gamma_p*B0*t_90)
+
+if True:
+    zs = np.linspace(-15e-3, 15e-3, 1000)
+    plt.figure()
+    #plt.plot(zs, [mu_x(0,y,0) for z in zs])
+    plt.plot(zs, [mu_y(0,z,0) for z in zs])
+    #plt.plot(zs, [mu_z(0,y,0) for z in zs])
+    plt.show()
+
+# would have to solve Bloch Equations
+#                             ( B_RF sin(omega*t) )
+# dvec(M)/dt = gamma vec(M) x (         0         )          
+#                             (         B_z       )
+
+####################################################################################
+
+Bz = B0
+Brf = BRF(0,0,0)
+omega = 61.79e6
+def Bloch_equation_with_RF_field(t, M):
+    dM_dt = gamma_p*np.cross(M, [Brf*np.sin(omega_NMR*t), Brf*np.cos(omega_NMR*t), Bz])
+    return dM_dt
+
+rk_res = integrate.RK45(Bloch_equation_with_RF_field,
+                        t0=0,
+                        y0=[0.3,0.3,0.3],
+                        t_bound=t_90,
+                        max_step=t_90/100000)
+history = []
+while rk_res.status == "running":
+    history.append([rk_res.t, rk_res.y])
+    rk_res.step()
+
+####################################################################################
+
+def Bloch_equation_with_RF_field(M, t, gamma_p, Bz, Brf, omega, T1=np.inf, T2=np.inf):
+    # M is a vector of length 3 and is: M = [Mx, My, My].
+    # Return dM_dt, that is a vector of length 3 as well.
+    Mx, My, Mz = M
+    M0 = 1
+    #relaxation = np.array([-Mx/T2, -My/T2, -(Mz-M0)/T1])
+    
+    dM_dt = gamma_p*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
+    return dM_dt
+
+solution = integrate.odeint(Bloch_equation_with_RF_field,
+                            y0=[0.3, 0.3, 0.3],
+                            t=np.linspace(0., t_90, 100000),
+                            args=(gamma_p, B0, BRF(0,0,0), omega_NMR ))
+
+
+plt.figure()
+plt.plot([h[1][0] for h in history])
+plt.plot(solution[:,0], label="x", color="r", ls="--")
+plt.plot(solution[:,1], label="y", color="b")
+plt.plot(solution[:,2], label="z", color="g")
+plt.show()
+
+
 
 ########################################################################################
 
 # Let the spin precess
 # T2 transversal relaxation
-
+'''
 mu_T = np.sqrt(mu_x**2 + mu_y**2)
-mu_x(t) = - mu_T * np.cos(gamma * B0(vec(r))*t)*np.exp(-t/T2)
+mu_x(t) = - mu_T * np.cos(gamma_p * B0(x,y,z,t)*t)*np.exp(-t/T2)
 mu_y(t) = mu_y(t_0)
-mu_z(t) = mu_T * np.sin(gamma * B0(vec(r))*t)*np.exp(-t/T2)
+mu_z(t) = mu_T * np.sin(gamma_p * B0(x,y,z,t)*t)*np.exp(-t/T2)
 
 # Add longitudinal relaxation (T1)
+
+# integrate dM/dt with RK4
+# dMx/dt = -gamma_p(My*Bz-Mz*By) - Mx/T2
+# dMy/dt = -gamma_p(Mz*Bx-Mx*Bz) - My/T2
+# dMz/dt = -gamma_p(Mx*By-My*Bx) - (Mz-M0)/T1
+
+# limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
 
 ########################################################################################
 
@@ -164,5 +240,5 @@ phi(t) = np.sum(coil_turns*vec(B2(vec(r_mu)))*vec(mu(t)))/I1
 
 ########################################################################################
 
-# integrate dM/dt with RK4
+
 '''
