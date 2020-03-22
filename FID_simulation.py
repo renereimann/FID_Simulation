@@ -11,42 +11,42 @@
 
 import numpy as np
 from scipy import integrate
+from numericalunits import µ0, NA, kB, T, mm, cm, m, s, ms, us, Hz, MHz, K, J, g, mol, A, ohm, W, N, kg, V
 import matplotlib.pyplot as plt
 
 ########################################################################################
 # Definition of constants used within the script
 
 # Universal Constants
-mu0 = 4*np.pi*1e-7 # N/A^2 # magnetic constant, vacuum permeability, permeability of free space, permeability of vacuum, magnetic permeability
-kB = 1.380649e-23 # J/K  # Boltzmann constant
-N_A = 6.02214076e23 # 1/mol # Avogadro constant
-mu_p = 1.41060679736e-26 # J/T # proton magnetic moment
-gamma_p = 2.6752218744e8 # 1/s/T # gyromagnetic ratio of proton (the spin sample particles)
+mu_p = 1.41060679736e-26*J/T  # proton magnetic moment
+gamma_p = 2.6752218744e8 *Hz/T # gyromagnetic ratio of proton (the spin sample particles)
 
 # Geometry - Fixed Probe
-probe_total_length = 100.00e-3 #m
-probe_total_diameter = 8.00e-3 #m
-coil_diameter = 2*2.3e-3 # m
-coil_length = 15.0e-3 #m
+probe_total_length = 100.0*mm 
+probe_total_diameter = 8.0*mm
+coil_diameter = 4.6*mm
+coil_length = 15.0*mm
 coil_turns = 30
-cell_length = 30.0e-3 #m
-cell_diameter = 1.5e-3 #m
+cell_length = 30.0*mm
+cell_diameter = 1.5*mm
 
 # Probe Material
 # values from wolframalpha.com "petrolium jelly"
 probe_material_name = "Petroleum Jelly"
 probe_material_formula = "C40H46N4O10"
-molar_mass = 742.8 # g/mol
-density = 0.848*1e-6 # g/m^3
-T2 = 40*1e-3     # sec
+molar_mass = 742.8*g/mol
+density = 0.848*g/cm**3
+T2 = 40*ms
 
 # magnetic field
-B0 = 1.45            # T, static field strength
-T = 273.15 + 26.85   # K
-I = 0.8 # A
-# B1, RF field strength, will be calculated below
-omega_NMR = 61.79e6 # Hz, circuit of the probe tuned for this value
-# impedance = 50 # Ohm
+B0 = 1.45 * T            # static field strength
+temp = (273.15 + 26.85) * K 
+omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
+impedance = 50 * ohm
+guete = 0.60
+pulse_power = 10*W
+I = guete * np.sqrt(2*pulse_power/impedance)
+print("I=", I/A, "A")
 
 # simulation
 seed = 12345
@@ -67,9 +67,9 @@ z = np.random.uniform(-cell_length/2., cell_length/2., size=N_cells)
 x = r*np.sin(phi)
 y = r*np.cos(phi)
 
-nuclear_polarization = (np.exp(mu_p*B0/kB/T) - np.exp(-mu_p*B0/kB/T))/(np.exp(mu_p*B0/kB/T) + np.exp(-mu_p*B0/kB/T))
+nuclear_polarization = (np.exp(mu_p*B0/kB/temp) - np.exp(-mu_p*B0/kB/temp))/(np.exp(mu_p*B0/kB/temp) + np.exp(-mu_p*B0/kB/temp))
 V_cell = np.pi*(cell_diameter/2.)**2 * cell_length
-number_density = density/molar_mass*N_A  # 1/cm^3
+number_density = density/molar_mass*NA  # 1/cm^3
 M = mu_p * number_density * nuclear_polarization
 dipole_moment = M * V_cell/N_cells # J/T
 
@@ -80,16 +80,16 @@ spin_phi = np.random.uniform(0, 2*np.pi, size=N_cells)
 
 # the field of the coil
 # Assume Biot-Savart law
-# vec(B)(vec(r)) = mu0 / 4pi Int_C I dvec(L) x vec(r)' / |vec(r)'|^3
+# vec(B)(vec(r)) = µ0 / 4pi Int_C I dvec(L) x vec(r)' / |vec(r)'|^3
 # Approximations:
 #      - static, Biot-Savart law only holds for static current,
 #        in case of time-dependence use Jefimenko's equations.
 #        Jefimenko's equation:
-#        vec(B)(vec(r)) = mu0 / 4pi Int ( J(r',t_r)/|r-r'|^3 + 1/(|r-r'|^2 c)*partial J(r', t_r)/partial t)  x (r-r') d^3r'
+#        vec(B)(vec(r)) = µ0 / 4pi Int ( J(r',t_r)/|r-r'|^3 + 1/(|r-r'|^2 c)*partial J(r', t_r)/partial t)  x (r-r') d^3r'
 #        with t_r = t-|r-r'|/c
 #        --> |r-r'|/c of order 0.1 ns
 #      - infinite small cables, if cables are extendet use the dV form of Biot-Savart
-#        vec(B)(vec(r)) = mu0 / 4pi IntIntInt_V (vec(J)dV) x vec(r)' / |vec(r)'|^3
+#        vec(B)(vec(r)) = µ0 / 4pi IntIntInt_V (vec(J)dV) x vec(r)' / |vec(r)'|^3
 #      - closed loop
 #      - constant current, can factor out the I from integral
 
@@ -105,22 +105,23 @@ dly = lambda phi: -coil_diameter/2. * np.sin(phi)
 dlz = lambda phi: coil_length / (2*np.pi*coil_turns)
 
 dist = lambda phi, x, y, z: np.sqrt((lx(phi)-x)**2+(ly(phi)-y)**2+(lz(phi)-z)**2)
+
 integrand_x = lambda phi, x, y, z: ( dly(phi) * (z-lz(phi)) - dlz(phi) * (y-ly(phi)) ) / dist(phi, x, y, z)**3
 integrand_y = lambda phi, x, y, z: ( dlz(phi) * (x-lx(phi)) - dlx(phi) * (z-lz(phi)) ) / dist(phi, x, y, z)**3
 integrand_z = lambda phi, x, y, z: ( dlx(phi) * (y-ly(phi)) - dly(phi) * (x-lx(phi)) ) / dist(phi, x, y, z)**3
 
-B1_x = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_x(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
-B1_y = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_y(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
-B1_z = lambda x, y, z : mu0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_z(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
+B1_x = lambda x, y, z : µ0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_x(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
+B1_y = lambda x, y, z : µ0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_y(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
+B1_z = lambda x, y, z : µ0/(4*np.pi) * I * integrate.quad(lambda phi: integrand_z(phi, x, y, z), 0, 2*np.pi*coil_turns)[0]
 
 if False:
     # make a plot for comparison
     cross_check = np.genfromtxt("./RF_coil_field_cross_check.txt", delimiter=", ")
-    zs = np.linspace(-15e-3, 15e-3, 1000)
+    zs = np.linspace(-15*mm, 15*mm, 1000)
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="Cross-Check from DocDB 16856, Slide 5\n$\O=2.3\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="orange")
     B1_z0 = B1_z(0, 0, 0)
-    plt.plot(zs, [B1_z(0, 0, z)/B1_z0 for z in zs], label="My calculation\n$\O=4.6\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k", ls=":")
+    plt.plot(zs/mm, [B1_z(0, 0, z)/B1_z0 for z in zs], label="My calculation\n$\O=4.6\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k", ls=":")
     plt.xlabel("z / mm")
     plt.ylabel("$B_z(0,0,z)\, /\, B_z(0,0,0)$")
     plt.legend(loc="lower right")
@@ -133,20 +134,19 @@ if False:
 # apply RF field
 # B1 field strength of RF field
 # for time of t_pi2 = pi/(2 gamma B1)
-
-BRF = lambda x, y, z: np.sqrt(B1_x(x, y, z)**2 + B1_x(x, y, z)**2 + B1_x(x, y, z)**2)
+BRF = lambda x, y, z: np.sqrt(B1_x(x, y, z)**2 + B1_y(x, y, z)**2 + B1_z(x, y, z)**2)
 B0_xyz = lambda x, y, z, t: B0
 
 B_tot_x = lambda t: BRF*np.cos(omega_NMR*t)
 B_tot_y = lambda t: BRF*np.sin(omega_NMR*t)
 B_tot_z = B0
 
-t_90 = np.pi/(2*gamma_p*BRF(0,0,0)) #BRF(0,0,0)
-print(BRF(0,0,0))
-print(gamma_p)
-print("%.2e"%t_90)
-t_90 = 40.0e-6 # sec
-print(t_90)
+
+t_90 = np.pi/(2*gamma_p*BRF(0*mm,0*mm,0*mm)/2.)
+print("Brf(0,0,0)", BRF(0*mm,0*mm,0*mm)/T, "T")
+print("t_90", t_90/us, "µs")
+#t_90 = 10.0*us # sec
+print("t_90", t_90/us, "µs")
 
 # spin
 # aproximation
@@ -155,20 +155,35 @@ mu_y = lambda x, y, z: np.cos(gamma_p*BRF(x,y,z)/2.*t_90)
 mu_z = lambda x, y, z: np.sin(gamma_p*BRF(x,y,z)/2.*t_90)*np.sin(gamma_p*B0*t_90)
 
 if True:
-    zs = np.linspace(-15e-3, 15e-3, 1000)
+    zs = np.linspace(-15*mm, 15*mm, 1000)
+    cross_check = np.genfromtxt("./mu_y_vs_z.txt", delimiter=" ")
     plt.figure()
+    plt.plot(cross_check[:,0], cross_check[:,1], label="$\mu_y$, Cross-Check from DocDB 16856, Slide 7", color="orange")
     #plt.plot(zs, [mu_x(0,y,0) for z in zs])
-    plt.plot(zs, [mu_y(0,z,0) for z in zs])
+    scan = np.array([mu_x(0*mm,0*mm,z) for z in zs])
+    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
+    plt.plot(zs/mm, scan, label="$\mu_x(0, 0, z)$" )
+    scan = np.array([mu_y(0*mm,0*mm,z) for z in zs])
+    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
+    plt.plot(zs/mm, scan, label="$\mu_y(0, 0, z)$" )
+    scan = np.array([mu_z(0*mm,0*mm,z) for z in zs])
+    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
+    plt.plot(zs/mm, scan, label="$\mu_z(0, 0, z)$" )
     #plt.plot(zs, [mu_z(0,y,0) for z in zs])
+    plt.xlabel("z / mm")
+    plt.ylabel("see legend")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("./plots/magnitization_after_pi2_pulse.pdf", bbox_inches="tight")
     plt.show()
-
+input()
 # would have to solve Bloch Equations
 #                             ( B_RF sin(omega*t) )
 # dvec(M)/dt = gamma vec(M) x (         0         )          
 #                             (         B_z       )
-
+"""
 ####################################################################################
-
+"""
 Bz = B0
 Brf = BRF(0,0,0)
 omega = 61.79e6
@@ -205,13 +220,14 @@ solution = integrate.odeint(Bloch_equation_with_RF_field,
 
 
 plt.figure()
-plt.plot([h[1][0] for h in history])
-plt.plot(solution[:,0], label="x", color="r", ls="--")
-plt.plot(solution[:,1], label="y", color="b")
-plt.plot(solution[:,2], label="z", color="g")
+plt.plot([h[1][0] for h in history], label="$M_x$ (RK45)")
+plt.plot(solution[:,0], color="r", ls="--", label="$M_x$ (odeint)")
+plt.plot(solution[:,1], color="b", label="$M_y$ (odeint)")
+plt.plot(solution[:,2], color="g", label="$M_z$ (odeint)")
+plt.xlabel("time / steps")
+plt.ylabel("$M_i$")
+plt.legend()
 plt.show()
-
-
 
 ########################################################################################
 
