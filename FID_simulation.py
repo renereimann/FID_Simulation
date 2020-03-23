@@ -65,6 +65,11 @@ class Probe(object):
             self.y = r*np.cos(phi)
             self.z = z
 
+        def set_M(self, mu_x, mu_y, mu_z):
+            self.mu_x = mu_x
+            self.mu_y = mu_y
+            self.mu_z = mu_z
+
     def __init__(self, length, diameter, material, temp, B_field, N_cells, seed):
         self.length = length
         self.radius = diameter / 2.
@@ -92,6 +97,17 @@ class Probe(object):
         zs = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
         self.cells = [Probe.Cell(r, phi, z) for r, phi, z in zip(rs, phis, zs)]
 
+    def apply_rf_field(self, rf_field, time):
+        # spin
+        # aproximation
+        mu_x = lambda x, y, z: np.sin(γₚ*rf_field(x,y,z)/2.*time)*np.cos(γₚ*self.B_field(x, y, z)*time)
+        mu_y = lambda x, y, z: np.cos(γₚ*rf_field(x,y,z)/2.*time)
+        mu_z = lambda x, y, z: np.sin(γₚ*rf_field(x,y,z)/2.*time)*np.sin(γₚ*self.B_field(x, y, z)*time)
+
+        for c in self.cells:
+            c.set_M(mu_x(c.x, c.y, c.z), mu_y(c.x, c.y, c.z), mu_z(c.x, c.y, c.z))
+
+        return mu_x, mu_y, mu_z
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -219,28 +235,20 @@ print("t_90", t_90/us, "µs")
 #t_90 = 10.0*us # sec
 print("t_90", t_90/us, "µs")
 
-# spin
-# aproximation
-mu_x = lambda x, y, z: np.sin(γₚ*nmr_coil.B_field_mag(x,y,z)/2.*t_90)*np.cos(γₚ*B0.B_field(x, y, z)*t_90)
-mu_y = lambda x, y, z: np.cos(γₚ*nmr_coil.B_field_mag(x,y,z)/2.*t_90)
-mu_z = lambda x, y, z: np.sin(γₚ*nmr_coil.B_field_mag(x,y,z)/2.*t_90)*np.sin(γₚ*B0.B_field(x, y, z)*t_90)
+mu_x, mu_y, mu_z = nmr_probe.apply_rf_field(nmr_coil.B_field_mag, t_90)
 
 if True:
     zs = np.linspace(-15*mm, 15*mm, 1000)
     cross_check = np.genfromtxt("./mu_y_vs_z.txt", delimiter=" ")
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="$\mu_y$, Cross-Check from DocDB 16856, Slide 7", color="orange")
-    #plt.plot(zs, [mu_x(0,y,0) for z in zs])
     scan = np.array([mu_x(0*mm,0*mm,z) for z in zs])
-    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
+    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_y for c in nmr_probe.cells])
     plt.plot(zs/mm, scan, label="$\mu_x(0, 0, z)$" )
     scan = np.array([mu_y(0*mm,0*mm,z) for z in zs])
-    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
     plt.plot(zs/mm, scan, label="$\mu_y(0, 0, z)$" )
     scan = np.array([mu_z(0*mm,0*mm,z) for z in zs])
-    #scan = (scan-np.min(scan))/(np.max(scan)-np.min(scan))
     plt.plot(zs/mm, scan, label="$\mu_z(0, 0, z)$" )
-    #plt.plot(zs, [mu_z(0,y,0) for z in zs])
     plt.xlabel("z / mm")
     plt.ylabel("see legend")
     plt.legend()
