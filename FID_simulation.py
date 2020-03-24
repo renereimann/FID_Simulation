@@ -165,9 +165,9 @@ class Probe(object):
         # individual cells, all operations before are linear
         # Note the mix down will only effect the
         # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))
+        dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
         # mu_y = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_y_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))
+        dmu_y_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
         # mu_z = lambda cell : cell.mu_z
         dmu_z_dt = lambda cell: 0
         # z component static, no induction, does not contribute
