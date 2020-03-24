@@ -9,6 +9,7 @@
 ################################################################################
 # Import first
 
+import time
 import numpy as np
 from scipy import integrate
 from numericalunits import µ0, NA, kB, mm, cm, m, s, ms, us, Hz, MHz
@@ -22,23 +23,56 @@ import matplotlib.pyplot as plt
 
 ################################################################################
 
+class Vector3D(object):
+    def __init__(self, *args):
+        self.val = np.array(args)
+
+    def mag(self):
+        return np.sqrt(np.sum(self.val**2))
+
+    @property
+    def x(self):
+        return self.val[0]
+
+    @x.setter
+    def x(self, value):
+        self.val[0] = value
+
+    @property
+    def y(self):
+        return self.val[1]
+
+    @y.setter
+    def y(self, value):
+        self.val[1] = value
+
+    @property
+    def z(self):
+        return self.val[2]
+
+    @z.setter
+    def z(self, value):
+        self.val[2] = value
+
+
 class PermanentMagnet(object):
     def __init__(self, B0):
         self.B0 = B0
 
     def B_field(self, x=0, y=0, z=0):
-        return self.B0
+        return Vector3D(0*T, 0*T, self.B0)
 
     def __call__(self, x=0, y=0, z=0):
         return self.B_field(x, y, z)
 
 
 class Material(object):
-    def __init__(self, name, formula=None, density=None, molar_mass=None, T2=None):
+    def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None):
         self.name = name
         self.formula = formula
         self.density = density
         self.molar_mass = molar_mass
+        self.T1 = T1
         self.T2 = T2
 
     def __str__(self):
@@ -49,6 +83,8 @@ class Material(object):
             inof.append(density/(g/cm**3) + " g/cm^3")
         if self.molar_mass is not None:
             inof.append(molar_mass/(g/mol) + " g/mol")
+        if self.T1 is not None:
+            inof.append(T1/ms + " ms")
         if self.T2 is not None:
             inof.append(T2/ms + " ms")
         return name + "(" + ", ".join(info) + ")"
@@ -65,11 +101,6 @@ class Probe(object):
             self.y = r*np.cos(phi)
             self.z = z
 
-        def set_M(self, mu_x, mu_y, mu_z):
-            self.mu_x = mu_x
-            self.mu_y = mu_y
-            self.mu_z = mu_z
-
     def __init__(self, length, diameter, material, temp, B_field, N_cells, seed):
         self.length = length
         self.radius = diameter / 2.
@@ -84,7 +115,7 @@ class Probe(object):
         self.N_cells = N_cells
 
         # dipoles are aligned with the external field at the beginning
-        expon = μₚ * self.B_field(0*mm, 0*mm, 0*mm) / (kB*temp)
+        expon = μₚ * self.B_field(0*mm, 0*mm, 0*mm).mag() / (kB*temp)
         self.nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
         self.magnetization = μₚ * self.material.number_density * self.nuclear_polarization
         self.dipole_moment_mag = self.magnetization * self.V_cell/N_cells
@@ -97,17 +128,30 @@ class Probe(object):
         zs = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
         self.cells = [Probe.Cell(r, phi, z) for r, phi, z in zip(rs, phis, zs)]
 
+        for c in self.cells:
+            c.B0 = self.B_field(c.x, c.y, c.z)
+
     def apply_rf_field(self, rf_field, time):
         # spin
         # aproximation
-        mu_x = lambda x, y, z: np.sin(γₚ*rf_field(x,y,z)/2.*time)*np.cos(γₚ*self.B_field(x, y, z)*time)
-        mu_y = lambda x, y, z: np.cos(γₚ*rf_field(x,y,z)/2.*time)
-        mu_z = lambda x, y, z: np.sin(γₚ*rf_field(x,y,z)/2.*time)*np.sin(γₚ*self.B_field(x, y, z)*time)
 
         for c in self.cells:
-            c.set_M(mu_x(c.x, c.y, c.z), mu_y(c.x, c.y, c.z), mu_z(c.x, c.y, c.z))
+            c.B1 = rf_field(c.x, c.y, c.z)
+        mu_x = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
+        mu_y = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
+        mu_z = lambda cell: np.cos(γₚ*cell.B1.mag()/2.*time)
+        for c in self.cells:
+            c.mu_x = mu_x(c)
+            c.mu_y = mu_y(c)
+            c.mu_z = mu_z(c)
+            c.mu_T = np.sqrt(c.mu_x**2 + c.mu_y**2)
 
-        return mu_x, mu_y, mu_z
+    def relax_B_dot_mu(self, t):
+        mu_x = lambda cell : cell.mu_T*np.sin(γₚ*cell.B0.mag()*t)*np.exp(-t/self.material.T2)
+        mu_y = lambda cell : cell.mu_T*np.cos(γₚ*cell.B0.mag()*t)*np.exp(-t/self.material.T2)
+        mu_z = lambda cell : cell.mu_z
+
+        return np.sum( [cell.B1.x * mu_x(cell) + cell.B1.y * mu_y(cell) + cell.B1.z * mu_z(cell) for cell in self.cells] )
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -168,12 +212,11 @@ class Coil(object):
         B_y = lambda x, y, z : µ0/(4*np.pi) * current * integrate.quad(lambda phi: integrand_y(phi, x, y, z), 0, 2*np.pi*self.turns)[0]
         B_z = lambda x, y, z : µ0/(4*np.pi) * current * integrate.quad(lambda phi: integrand_z(phi, x, y, z), 0, 2*np.pi*self.turns)[0]
 
-        return np.array((B_x(x,y,z), B_y(x,y,z), B_z(x,y,z)), dtype=[("x", np.float), ("y", np.float), ("z", np.float)])
+        return Vector3D(B_x(x,y,z), B_y(x,y,z), B_z(x,y,z))
 
-    def B_field_mag(self, x, y, z, **kwargs):
-        B = self.B_field(x, y, z, **kwargs)
-        return np.sqrt(B["x"]**2 + B["y"]**2 + B["z"]**2)
-
+    def pickup_flux(self, probe, t):
+        # Φ(t) = Σ N B₂(r) * μ(t) / I
+        return self.turns * probe.relax_B_dot_mu(t) / self.current
 
 ################################################################################
 # that about motion / diffusion within material
@@ -187,6 +230,7 @@ petroleum_jelly = Material(name = "Petroleum Jelly",
                            formula = "C40H46N4O10",
                            density = 0.848*g/cm**3,
                            molar_mass = 742.8*g/mol,
+                           T1 = 1*s,
                            T2 = 40*ms)
 
 nmr_probe = Probe(length = 30.0*mm,
@@ -201,7 +245,7 @@ impedance = 50 * ohm
 guete = 0.60
 pulse_power = 10*W
 current = guete * np.sqrt(2*pulse_power/impedance)
-print("I=", current/A, "A")
+print("I =", current/A, "A")
 
 nmr_coil = Coil(turns=30,
                length=15.0*mm,
@@ -214,8 +258,8 @@ if True:
     zs = np.linspace(-15*mm, 15*mm, 1000)
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="Cross-Check from DocDB 16856, Slide 5\n$\O=2.3\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="orange")
-    B_rf_z_0 = nmr_coil.B_field(0, 0, 0)["z"]
-    plt.plot(zs/mm, [nmr_coil.B_field(0, 0, z)["z"] / B_rf_z_0 for z in zs], label="My calculation\n$\O=4.6\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k", ls=":")
+    B_rf_z_0 = nmr_coil.B_field(0, 0, 0).z
+    plt.plot(zs/mm, [nmr_coil.B_field(0, 0, z).z / B_rf_z_0 for z in zs], label="My calculation\n$\O=4.6\,\mathrm{mm}$, $L=15\,\mathrm{mm}$, turns=30", color="k", ls=":")
     plt.xlabel("z / mm")
     plt.ylabel("$B_z(0,0,z)\, /\, B_z(0,0,0)$")
     plt.legend(loc="lower right")
@@ -229,26 +273,23 @@ if True:
 # B1 field strength of RF field
 # for time of t_pi2 = pi/(2 gamma B1)
 
-print("Brf(0,0,0)", nmr_coil.B_field_mag(0*mm,0*mm,0*mm)/T, "T")
-t_90 = np.pi/(2*γₚ*nmr_coil.B_field_mag(0*mm,0*mm,0*mm)/2.)
-print("t_90", t_90/us, "µs")
+print("Brf(0,0,0)", nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/T, "T")
+t_90 = np.pi/(2*γₚ*nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/2.)
+print("t_90", t_90/us, "mus")
 #t_90 = 10.0*us # sec
-print("t_90", t_90/us, "µs")
+print("t_90", t_90/us, "mus")
 
-mu_x, mu_y, mu_z = nmr_probe.apply_rf_field(nmr_coil.B_field_mag, t_90)
+nmr_probe.apply_rf_field(nmr_coil.B_field, t_90)
 
 if True:
     zs = np.linspace(-15*mm, 15*mm, 1000)
     cross_check = np.genfromtxt("./mu_y_vs_z.txt", delimiter=" ")
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="$\mu_y$, Cross-Check from DocDB 16856, Slide 7", color="orange")
-    scan = np.array([mu_x(0*mm,0*mm,z) for z in zs])
-    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_y for c in nmr_probe.cells])
-    plt.plot(zs/mm, scan, label="$\mu_x(0, 0, z)$" )
-    scan = np.array([mu_y(0*mm,0*mm,z) for z in zs])
-    plt.plot(zs/mm, scan, label="$\mu_y(0, 0, z)$" )
-    scan = np.array([mu_z(0*mm,0*mm,z) for z in zs])
-    plt.plot(zs/mm, scan, label="$\mu_z(0, 0, z)$" )
+    #scan = np.array([mu_x(0*mm,0*mm,z) for z in zs])
+    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_x for c in nmr_probe.cells], label="$\mu_x$")
+    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_y for c in nmr_probe.cells], label="$\mu_y$")
+    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_z for c in nmr_probe.cells], label="$\mu_z$")
     plt.xlabel("z / mm")
     plt.ylabel("see legend")
     plt.legend()
@@ -262,6 +303,17 @@ if True:
 #                             (         B_z       )
 
 ####################################################################################
+
+
+times = np.linspace(0*ms, 1*ms, 1000)
+t0 = time.time()
+flux = [nmr_coil.pickup_flux(nmr_probe, t) for t in times]
+print(time.time()-t0)
+
+plt.figure()
+plt.plot(times/ms, flux)
+plt.show()
+
 """
 Bz = B0
 Brf = rnm_coil.B_field_mag(0*mm,0*mm,0*mm)
@@ -331,12 +383,4 @@ mu_z(t) = mu_T * np.sin(γₚ * B0(x,y,z,t)*t)*np.exp(-t/T2)
 # limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
 
 ########################################################################################
-
-# Flux through pickup coil
-# sensitivity of coil
-phi(t) = np.sum(coil_turns*vec(B2(vec(r_mu)))*vec(mu(t)))/I1
-
-########################################################################################
-
-
 '''
