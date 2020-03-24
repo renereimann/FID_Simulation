@@ -146,9 +146,11 @@ class Probe(object):
             c.mu_z = mu_z(c)
             c.mu_T = np.sqrt(c.mu_x**2 + c.mu_y**2)
 
-    def relax_B_dot_mu(self, t):
-        mu_x = lambda cell : cell.mu_T*np.sin(γₚ*cell.B0.mag()*t)*np.exp(-t/self.material.T2)
-        mu_y = lambda cell : cell.mu_T*np.cos(γₚ*cell.B0.mag()*t)*np.exp(-t/self.material.T2)
+    def relax_B_dot_mu(self, t, mix_down=0*MHz):
+        # a mix down_frequency can be propergated through and will effect the
+        # individual cells, all operations before are linear
+        mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        mu_y = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
         mu_z = lambda cell : cell.mu_z
 
         return np.sum( [cell.B1.x * mu_x(cell) + cell.B1.y * mu_y(cell) + cell.B1.z * mu_z(cell) for cell in self.cells] )
@@ -214,9 +216,11 @@ class Coil(object):
 
         return Vector3D(B_x(x,y,z), B_y(x,y,z), B_z(x,y,z))
 
-    def pickup_flux(self, probe, t):
+    def pickup_flux(self, probe, t, mix_down=0*MHz):
         # Φ(t) = Σ N B₂(r) * μ(t) / I
-        return self.turns * probe.relax_B_dot_mu(t) / self.current
+        # a mix down_frequency can be propergated through and will effect the
+        # individual cells
+        return self.turns * probe.relax_B_dot_mu(t, mix_down=mix_down) / self.current
 
 ################################################################################
 # that about motion / diffusion within material
@@ -252,7 +256,7 @@ nmr_coil = Coil(turns=30,
                diameter=4.6*mm,
                current=current)
 
-if True:
+if False:
     # make a plot for comparison
     cross_check = np.genfromtxt("./RF_coil_field_cross_check.txt", delimiter=", ")
     zs = np.linspace(-15*mm, 15*mm, 1000)
@@ -281,7 +285,7 @@ print("t_90", t_90/us, "mus")
 
 nmr_probe.apply_rf_field(nmr_coil.B_field, t_90)
 
-if True:
+if False:
     zs = np.linspace(-15*mm, 15*mm, 1000)
     cross_check = np.genfromtxt("./mu_y_vs_z.txt", delimiter=" ")
     plt.figure()
@@ -305,9 +309,9 @@ if True:
 ####################################################################################
 
 
-times = np.linspace(0*ms, 1*ms, 1000)
+times = np.linspace(0*ms, 100*ms, 10000)
 t0 = time.time()
-flux = [nmr_coil.pickup_flux(nmr_probe, t) for t in times]
+flux = [nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times]
 print(time.time()-t0)
 
 plt.figure()
@@ -317,8 +321,6 @@ plt.show()
 """
 Bz = B0
 Brf = rnm_coil.B_field_mag(0*mm,0*mm,0*mm)
-omega = 61.79e6
-# magnetic field
 omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
 
 def Bloch_equation_with_RF_field(t, M):
@@ -364,14 +366,6 @@ plt.legend()
 plt.show()
 
 ########################################################################################
-"""
-# Let the spin precess
-# T2 transversal relaxation
-'''
-mu_T = np.sqrt(mu_x**2 + mu_y**2)
-mu_x(t) = - mu_T * np.cos(γₚ * B0(x,y,z,t)*t)*np.exp(-t/T2)
-mu_y(t) = mu_y(t_0)
-mu_z(t) = mu_T * np.sin(γₚ * B0(x,y,z,t)*t)*np.exp(-t/T2)
 
 # Add longitudinal relaxation (T1)
 
@@ -383,4 +377,4 @@ mu_z(t) = mu_T * np.sin(γₚ * B0(x,y,z,t)*t)*np.exp(-t/T2)
 # limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
 
 ########################################################################################
-'''
+"""
