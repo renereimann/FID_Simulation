@@ -57,14 +57,75 @@ class Vector3D(object):
 
 class PermanentMagnet(object):
     def __init__(self, B0):
-        self.B0 = B0
-        self.n_max = 24
-        self.An = np.zeros(self.n_max)
+        self.An = self.P = { # dipoles
+                   1: 0*T,
+                   2: B0,
+                   3: 0*T,
+                   # quadrupoles
+                   4: 0*T/mm,
+                   5: 0*T/mm,
+                   6: 0*T/mm,
+                   7: 0*T/mm,
+                   8: 0*T/mm,
+                   # sextupoles
+                   9: 0*T/mm**2,
+                  10: 0*T/mm**2,
+                  11: 0*T/mm**2,
+                  12: 0*T/mm**2,
+                  13: 0*T/mm**2,
+                  14: 0*T/mm**2,
+                  15: 0*T/mm**2,
+                  # octupole
+                  16: 0*T/mm**3,
+                  17: 0*T/mm**3,
+                  18: 0*T/mm**3,
+                  19: 0*T/mm**3,
+                  20: 0*T/mm**3,
+                  21: 0*T/mm**3,
+                  22: 0*T/mm**3,
+                  23: 0*T/mm**3,
+                  24: 0*T/mm**3,
+                 }
 
-        self.P = 0
+        self.P = { # dipoles
+                   1: {"x": lambda x, y, z: 1, "y": lambda x, y, z: 0, "z": lambda x, y, z: 0},
+                   2: {"x": lambda x, y, z: 0, "y": lambda x, y, z: 1, "z": lambda x, y, z: 0},
+                   3: {"x": lambda x, y, z: 1, "y": lambda x, y, z: 0, "z": lambda x, y, z: 1},
+                   # quadrupoles
+                   4: {"x": lambda x, y, z: x, "y": lambda x, y, z: -y, "z": lambda x, y, z: 0},
+                   5: {"x": lambda x, y, z: z, "y": lambda x, y, z: 0, "z": lambda x, y, z: x},
+                   6: {"x": lambda x, y, z: 0, "y": lambda x, y, z: -y, "z": lambda x, y, z: z},
+                   7: {"x": lambda x, y, z: y, "y": lambda x, y, z: x, "z": lambda x, y, z: 0},
+                   8: {"x": lambda x, y, z: 0, "y": lambda x, y, z: z, "z": lambda x, y, z: y},
+                   # sextupoles
+                   9: {"x": lambda x, y, z: x**2-y**2, "y": lambda x, y, z: -2*x*y, "z": lambda x, y, z: 0},
+                  10: {"x": lambda x, y, z: 2*x*z, "y": lambda x, y, z: -2*y*z, "z": lambda x, y, z: x**2-y**2},
+                  11: {"x": lambda x, y, z: z**2-y**2, "y": lambda x, y, z: -2*x*y, "z": lambda x, y, z: 2*x*y},
+                  12: {"x": lambda x, y, z: 0, "y": lambda x, y, z: -2*y*z, "z": lambda x, y, z: z**2-y**2},
+                  13: {"x": lambda x, y, z: 2*x*y, "y": lambda x, y, z: x**2-y**2, "z": lambda x, y, z: 0},
+                  14: {"x": lambda x, y, z: y*z, "y": lambda x, y, z: x*z, "z": lambda x, y, z: x*y},
+                  15: {"x": lambda x, y, z: 0, "y": lambda x, y, z: z**2-y**2, "z": lambda x, y, z: 2*y*z},
+                  # octupole
+                  16: {"x": lambda x, y, z: x**3 - 3*x*y**2, "y": lambda x, y, z: y**3-3*x**2*y, "z": lambda x, y, z: 0},
+                  17: {"x": lambda x, y, z: 3*x**2*z-3*z*y**2, "y": lambda x, y, z: -6*x*y*z, "z": lambda x, y, z: x**3 - 3*x*y**2},
+                  18: {"x": lambda x, y, z: 3*x*z**2-3*x*y**2, "y": lambda x, y, z: -3*x**2*y-3*z**2*y+2*y**3, "z": lambda x, y, z: 3*x**2*z-3*z*y**2},
+                  19: {"x": lambda x, y, z: z**3-3*z*y**2, "y": lambda x, y, z: -6*x*y*z, "z": lambda x, y, z: 3*x*z**2 - 3*x*y**2},
+                  20: {"x": lambda x, y, z: 0, "y": lambda x, y, z: y**3-3*z**2*y, "z": lambda x, y, z: z**3-3*z*y**2},
+                  21: {"x": lambda x, y, z: 3*x**2*y-y**3, "y": lambda x, y, z: x**3-3*x*y**2, "z": lambda x, y, z: 0},
+                  22: {"x": lambda x, y, z: 6*x*y*z, "y": lambda x, y, z: 3*x**2*z-3*z*y**2, "z": lambda x, y, z: 3*x**2*y-y**3},
+                  23: {"x": lambda x, y, z: 3*z**2*y-y**3, "y": lambda x, y, z: 3*x*z**2-3*x*y**2, "z": lambda x, y, z: 6*x*y*z},
+                  24: {"x": lambda x, y, z: 0, "y": lambda x, y, z: z**3-3*z*y**2, "z": lambda x, y, z: 3*z**2*y-y**3},
+                 }
 
     def B_field(self, x=0, y=0, z=0):
-        return Vector3D(0*T, self.B0, 0*T)
+        Bx = 0
+        By = 0
+        Bz = 0
+        for i in self.P.keys():
+            Bx += self.An[i]*self.P[i]["x"](x, y, z)
+            By += self.An[i]*self.P[i]["y"](x, y, z)
+            Bz += self.An[i]*self.P[i]["z"](x, y, z)
+        return Vector3D(Bx, By, Bz)
 
     def __call__(self, x=0, y=0, z=0):
         return self.B_field(x, y, z)
