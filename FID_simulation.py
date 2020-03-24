@@ -64,7 +64,7 @@ class PermanentMagnet(object):
         self.P = 0
 
     def B_field(self, x=0, y=0, z=0):
-        return Vector3D(0*T, 0*T, self.B0)
+        return Vector3D(0*T, self.B0, 0*T)
 
     def __call__(self, x=0, y=0, z=0):
         return self.B_field(x, y, z)
@@ -143,8 +143,8 @@ class Probe(object):
         for c in self.cells:
             c.B1 = rf_field(c.x, c.y, c.z)
         mu_x = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
-        mu_y = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
-        mu_z = lambda cell: np.cos(γₚ*cell.B1.mag()/2.*time)
+        mu_y = lambda cell: np.cos(γₚ*cell.B1.mag()/2.*time)
+        mu_z = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
         for c in self.cells:
             c.mu_x = mu_x(c)
             c.mu_y = mu_y(c)
@@ -166,10 +166,10 @@ class Probe(object):
         # Note the mix down will only effect the
         # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
         dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
-        # mu_y = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_y_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
-        # mu_z = lambda cell : cell.mu_z
-        dmu_z_dt = lambda cell: 0
+        # mu_y = lambda cell : cell.mu_z
+        dmu_y_dt = lambda cell: 0
+        # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
         # z component static, no induction, does not contribute
         return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
