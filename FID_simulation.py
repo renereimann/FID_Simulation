@@ -155,6 +155,7 @@ class Probe(object):
 
         return np.sum( [cell.B1.x * mu_x(cell) + cell.B1.y * mu_y(cell) + cell.B1.z * mu_z(cell) for cell in self.cells] )
 
+
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
 
@@ -280,8 +281,6 @@ if False:
 print("Brf(0,0,0)", nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/T, "T")
 t_90 = np.pi/(2*γₚ*nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/2.)
 print("t_90", t_90/us, "mus")
-#t_90 = 10.0*us # sec
-print("t_90", t_90/us, "mus")
 
 nmr_probe.apply_rf_field(nmr_coil.B_field, t_90)
 
@@ -301,24 +300,29 @@ if False:
     plt.savefig("./plots/magnitization_after_pi2_pulse.pdf", bbox_inches="tight")
     plt.show()
 
+####################################################################################
+
+times = np.linspace(0*ms, 100*ms, 10000)
+t0 = time.time()
+flux = [nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times]
+print("Needed", time.time()-t0, "sec to calculate FID.")
+
+if True:
+    plt.figure()
+    plt.plot(times/ms, flux)
+    plt.xlabel("t / ms")
+    plt.ylabel("flux through coil / a.u.")
+    plt.tight_layout()
+    plt.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
+    plt.show()
+
+"""
+
 # would have to solve Bloch Equations
 #                             ( B_RF sin(omega*t) )
 # dvec(M)/dt = gamma vec(M) x (         0         )
 #                             (         B_z       )
 
-####################################################################################
-
-
-times = np.linspace(0*ms, 100*ms, 10000)
-t0 = time.time()
-flux = [nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times]
-print(time.time()-t0)
-
-plt.figure()
-plt.plot(times/ms, flux)
-plt.show()
-
-"""
 Bz = B0
 Brf = rnm_coil.B_field_mag(0*mm,0*mm,0*mm)
 omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
