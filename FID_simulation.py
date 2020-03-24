@@ -58,6 +58,10 @@ class Vector3D(object):
 class PermanentMagnet(object):
     def __init__(self, B0):
         self.B0 = B0
+        self.n_max = 24
+        self.An = np.zeros(self.n_max)
+
+        self.P = 0
 
     def B_field(self, x=0, y=0, z=0):
         return Vector3D(0*T, 0*T, self.B0)
@@ -114,22 +118,23 @@ class Probe(object):
         self.rng = np.random.RandomState(seed)
         self.N_cells = N_cells
 
-        # dipoles are aligned with the external field at the beginning
-        expon = μₚ * self.B_field(0*mm, 0*mm, 0*mm).mag() / (kB*temp)
-        self.nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
-        self.magnetization = μₚ * self.material.number_density * self.nuclear_polarization
-        self.dipole_moment_mag = self.magnetization * self.V_cell/N_cells
-
         self.initialize_cells(self.N_cells)
 
     def initialize_cells(self, N_cells):
+        # place cells
         rs = np.sqrt(self.rng.uniform(0,self.radius**2, size=N_cells))
         phis = self.rng.uniform(0, 2*np.pi, size=N_cells)
         zs = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
         self.cells = [Probe.Cell(r, phi, z) for r, phi, z in zip(rs, phis, zs)]
 
+        # calculate quantities of cells
         for c in self.cells:
             c.B0 = self.B_field(c.x, c.y, c.z)
+            expon = μₚ * c.B0.mag() / (kB*self.temp)
+            c.nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
+            c.magnetization = μₚ * self.material.number_density * c.nuclear_polarization
+            # dipoles are aligned with the external field at the beginning
+            c.dipole_moment_mag = c.magnetization * self.V_cell/N_cells
 
     def apply_rf_field(self, rf_field, time):
         # spin
@@ -147,13 +152,26 @@ class Probe(object):
             c.mu_T = np.sqrt(c.mu_x**2 + c.mu_y**2)
 
     def relax_B_dot_mu(self, t, mix_down=0*MHz):
+        # flux in pickup coil depends on d/dt(B × μ)
+
+        # d/dt ( μₜ sin(γₚ |B0| t) exp(-t/T2) )
+        #       = μₜ [ d/dt( sin(γₚ |B0| t) ) exp(-t/T2) + sin(γₚ |B0| t) d/dt( exp(-t/T2) )]
+        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) exp(-t/T2) + sin(γₚ |B0| t) (-1/T2) exp(-t/T2) ]
+        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) -1/T2 * sin(γₚ |B0| t) ] exp(-t/T2)
+        # make use of Addition theorem a cos(α) + b sin(α) = √(a² + b²) cos(α - arctan(-b/a))
+        #       = μₜ √(γₚ² |B0|² + 1/T2²) cos(γₚ |B0| t - arctan(1/(T2γₚ |B0|)) exp(-t/T2)
+
         # a mix down_frequency can be propergated through and will effect the
         # individual cells, all operations before are linear
-        mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        mu_y = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        mu_z = lambda cell : cell.mu_z
-
-        return np.sum( [cell.B1.x * mu_x(cell) + cell.B1.y * mu_y(cell) + cell.B1.z * mu_z(cell) for cell in self.cells] )
+        # Note the mix down will only effect the
+        # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))
+        # mu_y = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        dmu_y_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))
+        # mu_z = lambda cell : cell.mu_z
+        dmu_z_dt = lambda cell: 0
+        # z component static, no induction, does not contribute
+        return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
 
 class Coil(object):
