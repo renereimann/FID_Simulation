@@ -214,6 +214,7 @@ class Probe(object):
 
     def relax_B_dot_mu(self, t, mix_down=0*MHz):
         # flux in pickup coil depends on d/dt(B × μ)
+        # --> y component static, no induction, does not contribute
 
         # d/dt ( μₜ sin(γₚ |B0| t) exp(-t/T2) )
         #       = μₜ [ d/dt( sin(γₚ |B0| t) ) exp(-t/T2) + sin(γₚ |B0| t) d/dt( exp(-t/T2) )]
@@ -225,15 +226,30 @@ class Probe(object):
         # a mix down_frequency can be propergated through and will effect the
         # individual cells, all operations before are linear
         # Note the mix down will only effect the
-        # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
-        # mu_y = lambda cell : cell.mu_z
-        dmu_y_dt = lambda cell: 0
-        # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
-        # z component static, no induction, does not contribute
-        return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
+        # straight forward implementation
+        # very inefficient
+        # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        # dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
+        # mu_y = lambda cell : cell.mu_z
+        # dmu_y_dt = lambda cell: 0
+        # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
+        # dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
+        # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
+
+        t = np.atleast_1d(t)
+        mu_T = np.array([cell.mu_T for cell in self.cells])         # C
+        B0 = np.array([cell.B0.mag() for cell in self.cells])       # C
+        B1x = np.array([cell.B1.x for cell in self.cells])          # C
+        B1z = np.array([cell.B1.z for cell in self.cells])          # C
+        magnitude = mu_T*np.sqrt((γₚ*B0)**2 + 1/self.material.T2**2) # C
+        phase = np.arctan(1./(self.material.T2*γₚ*B0))               # C
+        omega_mixed = (γₚ*B0-mix_down)                               # C
+        argument = np.outer(omega_mixed,t) - phase[:, None]          # CT
+        # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
+        # already assumed that dmu_y_dt is 0, so we can leave out that term
+        B_x_dmu_dt = magnitude[:, None]*(B1x[:, None]*np.cos(argument) + B1z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
+        return np.sum(B_x_dmu_dt, axis=0)
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -387,7 +403,7 @@ if False:
 times = np.linspace(0*ms, 100*ms, 10000)
 print("Start calculating FID")
 t_start = time.time()
-flux = np.array([nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times])
+flux = nmr_coil.pickup_flux(nmr_probe, times, mix_down=61.74*MHz)
 t_stop = time.time()
 print("Needed", t_stop-t_start, "sec to calculate FID.")
 print("Needed", (t_stop-t_start)/10000., "per t point.")
