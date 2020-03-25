@@ -160,12 +160,6 @@ class Material(object):
 
 
 class Probe(object):
-    class Cell(object):
-        def __init__(self, r, phi, z):
-            self.x =  r*np.sin(phi)
-            self.y = r*np.cos(phi)
-            self.z = z
-
     def __init__(self, length, diameter, material, temp, B_field, N_cells, seed):
         self.length = length
         self.radius = diameter / 2.
@@ -183,34 +177,36 @@ class Probe(object):
 
     def initialize_cells(self, N_cells):
         # place cells
-        rs = np.sqrt(self.rng.uniform(0,self.radius**2, size=N_cells))
-        phis = self.rng.uniform(0, 2*np.pi, size=N_cells)
-        zs = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
-        self.cells = [Probe.Cell(r, phi, z) for r, phi, z in zip(rs, phis, zs)]
+        r = np.sqrt(self.rng.uniform(0,self.radius**2, size=N_cells))
+        phi = self.rng.uniform(0, 2*np.pi, size=N_cells)
+        self.cells_x = r*np.sin(phi)
+        self.cells_y = r*np.cos(phi)
+        self.cells_z = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
 
         # calculate quantities of cells
-        for c in self.cells:
-            c.B0 = self.B_field(c.x, c.y, c.z)
-            expon = μₚ * c.B0.mag() / (kB*self.temp)
-            c.nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
-            c.magnetization = μₚ * self.material.number_density * c.nuclear_polarization
-            # dipoles are aligned with the external field at the beginning
-            c.dipole_moment_mag = c.magnetization * self.V_cell/N_cells
+        B0 = [self.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)]
+        self.cells_B0 = np.array([B.mag() for B in B0])
+        self.cells_B0_x = np.array([B.x for B in B0])
+        self.cells_B0_y = np.array([B.y for B in B0])
+        self.cells_B0_z = np.array([B.z for B in B0])
+        expon = μₚ * self.cells_B0 / (kB*self.temp)
+        self.cells_nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
+        self.cells_magnetization = μₚ * self.material.number_density * self.cells_nuclear_polarization
+        # dipoles are aligned with the external field at the beginning
+        self.cells_dipole_moment_mag = self.cells_magnetization * self.V_cell/N_cells
 
     def apply_rf_field(self, rf_field, time):
-        # spin
         # aproximation
+        B1 = [rf_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)]
+        self.cells_B1 = np.array([B.mag() for B in B1])
+        self.cells_B1_x = np.array([B.x for B in B1])
+        self.cells_B1_y = np.array([B.y for B in B1])
+        self.cells_B1_z = np.array([B.z for B in B1])
 
-        for c in self.cells:
-            c.B1 = rf_field(c.x, c.y, c.z)
-        mu_x = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
-        mu_y = lambda cell: np.cos(γₚ*cell.B1.mag()/2.*time)
-        mu_z = lambda cell: np.sin(γₚ*cell.B1.mag()/2.*time)
-        for c in self.cells:
-            c.mu_x = mu_x(c)
-            c.mu_y = mu_y(c)
-            c.mu_z = mu_z(c)
-            c.mu_T = np.sqrt(c.mu_x**2 + c.mu_y**2)
+        self.cells_mu_x = np.sin(γₚ*self.cells_B1/2.*time)
+        self.cells_mu_y = np.cos(γₚ*self.cells_B1/2.*time)
+        self.cells_mu_z = np.sin(γₚ*self.cells_B1/2.*time)
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_y**2)
 
     def relax_B_dot_mu(self, t, mix_down=0*MHz):
         # flux in pickup coil depends on d/dt(B × μ)
@@ -238,17 +234,13 @@ class Probe(object):
         # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
         t = np.atleast_1d(t)
-        mu_T = np.array([cell.mu_T for cell in self.cells])         # C
-        B0 = np.array([cell.B0.mag() for cell in self.cells])       # C
-        B1x = np.array([cell.B1.x for cell in self.cells])          # C
-        B1z = np.array([cell.B1.z for cell in self.cells])          # C
-        magnitude = mu_T*np.sqrt((γₚ*B0)**2 + 1/self.material.T2**2) # C
-        phase = np.arctan(1./(self.material.T2*γₚ*B0))               # C
-        omega_mixed = (γₚ*B0-mix_down)                               # C
-        argument = np.outer(omega_mixed,t) - phase[:, None]          # CT
+        magnitude = self.cells_mu_T*np.sqrt((γₚ*self.cells_B0)**2 + 1/self.material.T2**2)
+        phase = np.arctan(1./(self.material.T2*γₚ*self.cells_B0))
+        omega_mixed = (γₚ*self.cells_B0-mix_down)
+        argument = np.outer(omega_mixed,t) - phase[:, None]
         # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
         # already assumed that dmu_y_dt is 0, so we can leave out that term
-        B_x_dmu_dt = magnitude[:, None]*(B1x[:, None]*np.cos(argument) + B1z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
+        B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
         return np.sum(B_x_dmu_dt, axis=0)
 
 class Coil(object):
@@ -388,9 +380,9 @@ if False:
     plt.figure()
     plt.plot(cross_check[:,0], cross_check[:,1], label="$\mu_y$, Cross-Check from DocDB 16856, Slide 7", color="orange")
     #scan = np.array([mu_x(0*mm,0*mm,z) for z in zs])
-    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_x for c in nmr_probe.cells], label="$\mu_x$")
-    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_y for c in nmr_probe.cells], label="$\mu_y$")
-    plt.scatter([c.z/mm for c in nmr_probe.cells], [c.mu_z for c in nmr_probe.cells], label="$\mu_z$")
+    plt.scatter(nmr_probe.cells_z/mm, nmr_probe.cells_mu_x, label="$\mu_x$")
+    plt.scatter(nmr_probe.cells_z/mm, nmr_probe.cells_mu_y, label="$\mu_y$")
+    plt.scatter(nmr_probe.cells_z/mm, nmr_probe.cells_mu_z, label="$\mu_z$")
     plt.xlabel("z / mm")
     plt.ylabel("see legend")
     plt.legend()
