@@ -12,14 +12,23 @@
 import time
 import numpy as np
 from scipy import integrate
-from numericalunits import µ0, NA, kB, mm, cm, m, s, ms, us, Hz, MHz
+from scipy import fftpack
+from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
 from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, V
 import matplotlib.pyplot as plt
 
 ################################################################################
 # Definition of constants used within the script
-μₚ = 1.41060679736e-26*J/T  # proton magnetic moment
-γₚ = 2.6752218744e8 *Hz/T # gyromagnetic ratio of proton
+
+# gyromagnetic ratio of proton,
+# value for free proton: 2.6752218744e8*Hz/T
+# here we do not have a free proton but the probe has a frequency of 61.79 MHz
+# at a magnetic field of 1.45 T.
+# this corresponds to: 267750358.71077695*Hz/T
+γₚ = (2*np.pi)*61.79*MHz/(1.45*T)
+# proton magnetic moment
+# value for free proton: 1.41060679736e-26*J/T
+μₚ = hbar/(2*γₚ)
 
 ################################################################################
 
@@ -62,11 +71,11 @@ class PermanentMagnet(object):
                    2: B0,
                    3: 0*T,
                    # quadrupoles
-                   4: 1.75e-6*T/mm,
+                   4: 0*T/mm,
                    5: 0*T/mm,
                    6: 0*T/mm,
                    7: 0*T/mm,
-                   8: 0*T/mm,
+                   8: 5e-6*B0/cm,
                    # sextupoles
                    9: 0*T/mm**2,
                   10: 0*T/mm**2,
@@ -236,7 +245,7 @@ class Probe(object):
         t = np.atleast_1d(t)
         magnitude = self.cells_mu_T*np.sqrt((γₚ*self.cells_B0)**2 + 1/self.material.T2**2)
         phase = np.arctan(1./(self.material.T2*γₚ*self.cells_B0))
-        omega_mixed = (γₚ*self.cells_B0-mix_down)
+        omega_mixed = (γₚ*self.cells_B0-2*np.pi*mix_down)
         argument = np.outer(omega_mixed,t) - phase[:, None]
         # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
         # already assumed that dmu_y_dt is 0, so we can leave out that term
@@ -392,7 +401,7 @@ if False:
 
 ####################################################################################
 
-times = np.linspace(0*ms, 100*ms, 10000)
+times = np.linspace(0*ms, 10*ms/np.pi*3, 10000)
 print("Start calculating FID")
 t_start = time.time()
 flux = nmr_coil.pickup_flux(nmr_probe, times, mix_down=61.74*MHz)
@@ -404,10 +413,20 @@ if True:
     plt.figure()
     plt.plot(times/ms, flux/(T*MHz/A))
     plt.xlabel("t / ms")
-    plt.xlim([0, 100])
+    plt.xlim([0, 10])
     plt.ylabel("flux through coil / (T*MHz/A)")
     plt.tight_layout()
     plt.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
+
+    N = len(times)                # Number of samplepoints
+    yf = fftpack.fft(flux)
+    xf = np.linspace(0.0, 1.0/(2.0*(times[1]-times[0]))/kHz, N/2)
+    fig = plt.figure()
+    plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
+    plt.xlabel("f / kHz")
+    plt.xlim([0, 1.0/(2.0*(times[1]-times[0]))/kHz])
+    plt.ylabel("|FFT(f)|")
+    plt.tight_layout()
     plt.show()
 
 """
