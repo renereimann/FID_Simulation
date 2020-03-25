@@ -62,7 +62,7 @@ class PermanentMagnet(object):
                    2: B0,
                    3: 0*T,
                    # quadrupoles
-                   4: 0*T/mm,
+                   4: 1.75e-6*T/mm,
                    5: 0*T/mm,
                    6: 0*T/mm,
                    7: 0*T/mm,
@@ -230,7 +230,7 @@ class Probe(object):
         # mu_y = lambda cell : cell.mu_z
         dmu_y_dt = lambda cell: 0
         # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0.mag()-mix_down)*t)*np.exp(-t/self.material.T2)
-        dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
+        dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0.mag())**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0.mag()-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0.mag()))))*np.exp(-t/self.material.T2)
         # z component static, no induction, does not contribute
         return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
@@ -361,7 +361,10 @@ print("Brf(0,0,0)", nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/T, "T")
 t_90 = np.pi/(2*γₚ*nmr_coil.B_field(0*mm,0*mm,0*mm).mag()/2.)
 print("t_90", t_90/us, "mus")
 
+t_start = time.time()
 nmr_probe.apply_rf_field(nmr_coil.B_field, t_90)
+t_stop = time.time()
+print("Needed", (t_stop-t_start), "seconds to apply RF field.")
 
 if False:
     zs = np.linspace(-15*mm, 15*mm, 1000)
@@ -382,15 +385,19 @@ if False:
 ####################################################################################
 
 times = np.linspace(0*ms, 100*ms, 10000)
-t0 = time.time()
-flux = [nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times]
-print("Needed", time.time()-t0, "sec to calculate FID.")
+print("Start calculating FID")
+t_start = time.time()
+flux = np.array([nmr_coil.pickup_flux(nmr_probe, t, mix_down=61.74*MHz) for t in times])
+t_stop = time.time()
+print("Needed", t_stop-t_start, "sec to calculate FID.")
+print("Needed", (t_stop-t_start)/10000., "per t point.")
 
 if True:
     plt.figure()
-    plt.plot(times/ms, flux)
+    plt.plot(times/ms, flux/(T*MHz/A))
     plt.xlabel("t / ms")
-    plt.ylabel("flux through coil / a.u.")
+    plt.xlim([0, 100])
+    plt.ylabel("flux through coil / (T*MHz/A)")
     plt.tight_layout()
     plt.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
     plt.show()
