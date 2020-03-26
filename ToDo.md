@@ -5,10 +5,9 @@ Nachlesen:
 * Windowing function, Hann Window
 
 Check:
-* Coordinate System
-* NMR frequency <-> gyromagnetic ratio of petrolium Jelly
-* t_90 <-> current
 * Magnetisierung / Normalisierung
+? NMR frequency <-> gyromagnetic ratio of petrolium Jelly
+* t_90 <-> current
 
 Improve Performance:
 * B-Field spule

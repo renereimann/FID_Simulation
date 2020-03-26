@@ -16,6 +16,8 @@ from scipy import fftpack
 from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
 from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, V
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 ################################################################################
 # Definition of constants used within the script
@@ -213,9 +215,9 @@ class Probe(object):
         self.cells_B1_z = np.array([B.z for B in B1])
 
         self.cells_mu_x = np.sin(γₚ*self.cells_B1/2.*time)
-        self.cells_mu_y = np.cos(γₚ*self.cells_B1/2.*time)
+        self.cells_mu_y = np.cos(γₚ*self.cells_B1/2.*time)      # direction of external field
         self.cells_mu_z = np.sin(γₚ*self.cells_B1/2.*time)
-        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_y**2)
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
     def relax_B_dot_mu(self, t, mix_down=0*MHz):
         # flux in pickup coil depends on d/dt(B × μ)
@@ -410,13 +412,22 @@ print("Needed", t_stop-t_start, "sec to calculate FID.")
 print("Needed", (t_stop-t_start)/10000., "per t point.")
 
 if True:
-    plt.figure()
-    plt.plot(times/ms, flux/(T*MHz/A))
-    plt.xlabel("t / ms")
-    plt.xlim([0, 10])
-    plt.ylabel("flux through coil / (T*MHz/A)")
-    plt.tight_layout()
-    plt.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
+    fig, ax = plt.subplots()
+    ax.plot(times/ms, flux/(T*MHz/A))
+    ax.set_xlabel("t / ms")
+    ax.set_xlim([0, 10])
+    ax.set_ylabel("flux through coil / (T*MHz/A)")
+    axins = inset_axes(ax, width="60%",  height="30%", loc=1)
+    axins.plot(times/ms, flux/(T*MHz/A))
+    axins.set_xlim([1.8, 2.8])
+    axins.set_ylim([-4000, 4000])
+    axins.yaxis.get_major_locator().set_params(nbins=7)
+    axins.xaxis.get_major_locator().set_params(nbins=7)
+    plt.xticks(visible=False)
+    plt.yticks(visible=False)
+    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+    fig.tight_layout()
+    fig.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
 
     N = len(times)                # Number of samplepoints
     yf = fftpack.fft(flux)
