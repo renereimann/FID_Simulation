@@ -32,7 +32,7 @@ class PermanentMagnet(object):
                    5: 0*T/mm,
                    6: 0*T/mm,
                    7: 0*T/mm,
-                   8: 5e-6*B0/cm,
+                   8: 0*T/cm,
                    # sextupoles
                    9: 0*T/mm**2,
                   10: 0*T/mm**2,
@@ -108,7 +108,7 @@ class Material(object):
         self.T1 = T1
         self.T2 = T2
         self.gyromagnetic_ratio = gyromagnetic_ratio
-        self.magnetic_moment = hbar/(2*self.gyromagnetic_ratio)
+        self.magnetic_moment = self.gyromagnetic_ratio*hbar/2
 
     def __str__(self):
         info = []
@@ -217,6 +217,7 @@ class Probe(object):
         B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
         return np.sum(B_x_dmu_dt, axis=0)
 
+
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
 
@@ -254,7 +255,7 @@ class Coil(object):
             - constant current, can factor out the I from integral
         """
 
-        phi = np.linspace(0, 2*np.pi*self.turns, 1000)
+        phi = np.linspace(0, 2*np.pi*self.turns, 10000)
         sPhi = np.sin(phi)
         cPhi = np.cos(phi)
         lx = self.radius*sPhi
@@ -288,6 +289,7 @@ class Coil(object):
 # what about spin-spin interactions
 
 B0 = PermanentMagnet( 1.45*T )
+B0.An[8] = 5e-6*B0.An[2]/cm
 
 # values from wolframalpha.com
 petroleum_jelly = Material(name = "Petroleum Jelly",
@@ -306,7 +308,6 @@ nmr_probe = Probe(length = 30.0*mm,
                   B_field = B0,
                   N_cells = 1000,
                   seed = 12345)
-
 impedance = 50 * ohm
 guete = 0.60
 pulse_power = 10*W
@@ -367,7 +368,7 @@ if False:
 
 ####################################################################################
 
-times = np.linspace(0*ms, 10*ms/np.pi*3, 10000)
+times = np.linspace(0*ms, 10*ms, 10000)
 print("Start calculating FID")
 t_start = time.time()
 flux = nmr_coil.pickup_flux(nmr_probe, times, mix_down=61.74*MHz)
