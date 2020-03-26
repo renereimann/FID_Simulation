@@ -20,19 +20,6 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 ################################################################################
-# Definition of constants used within the script
-
-# gyromagnetic ratio of proton,
-# value for free proton: 2.6752218744e8*Hz/T
-# here we do not have a free proton but the probe has a frequency of 61.79 MHz
-# at a magnetic field of 1.45 T.
-# this corresponds to: 267750358.71077695*Hz/T
-γₚ = (2*np.pi)*61.79*MHz/(1.45*T)
-# proton magnetic moment
-# value for free proton: 1.41060679736e-26*J/T
-μₚ = hbar/(2*γₚ)
-
-################################################################################
 
 class PermanentMagnet(object):
     def __init__(self, B0):
@@ -111,27 +98,33 @@ class PermanentMagnet(object):
 
 
 class Material(object):
-    def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None):
+    def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None, gyromagnetic_ratio=None):
+        # gyromagnetic ratio, value for free proton: 2.6752218744e8*Hz/T
+        # magnetic moment,  value for free proton: 1.41060679736e-26*J/T
         self.name = name
         self.formula = formula
         self.density = density
         self.molar_mass = molar_mass
         self.T1 = T1
         self.T2 = T2
+        self.gyromagnetic_ratio = gyromagnetic_ratio
+        self.magnetic_moment = hbar/(2*self.gyromagnetic_ratio)
 
     def __str__(self):
         info = []
         if self.formula is not None:
-            info.append(formula)
+            info.append(self.formula)
         if self.density is not None:
-            inof.append(density/(g/cm**3) + " g/cm^3")
+            info.append("%f g/cm^3"%(self.density/(g/cm**3)))
         if self.molar_mass is not None:
-            inof.append(molar_mass/(g/mol) + " g/mol")
+            info.append("%f g/mol"%(self.molar_mass/(g/mol)))
         if self.T1 is not None:
-            inof.append(T1/ms + " ms")
+            info.append("%f ms"%(self.T1/ms))
         if self.T2 is not None:
-            inof.append(T2/ms + " ms")
-        return name + "(" + ", ".join(info) + ")"
+            info.append("%f ms"%(self.T2/ms))
+        if self.gyromagnetic_ratio is not None:
+            info.append("%f Hz/T"%(self.gyromagnetic_ratio/(Hz/T)))
+        return self.name + "(" + ", ".join(info) + ")"
 
     @property
     def number_density(self):
@@ -169,9 +162,9 @@ class Probe(object):
         self.cells_B0_z = B0[:,2]
         self.cells_B0 = np.sqrt(np.sum(B0**2, axis=-1))
 
-        expon = μₚ * self.cells_B0 / (kB*self.temp)
+        expon = self.material.magnetic_moment * self.cells_B0 / (kB*self.temp)
         self.cells_nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
-        self.cells_magnetization = μₚ * self.material.number_density * self.cells_nuclear_polarization
+        self.cells_magnetization = self.material.magnetic_moment * self.material.number_density * self.cells_nuclear_polarization
         # dipoles are aligned with the external field at the beginning
         self.cells_dipole_moment_mag = self.cells_magnetization * self.V_cell/N_cells
 
@@ -184,9 +177,9 @@ class Probe(object):
         self.cells_B1 = np.sqrt(np.sum(B1**2, axis=-1))
 
         # aproximation
-        self.cells_mu_x = np.sin(γₚ*self.cells_B1/2.*time)
-        self.cells_mu_y = np.cos(γₚ*self.cells_B1/2.*time)
-        self.cells_mu_z = np.sin(γₚ*self.cells_B1/2.*time)
+        self.cells_mu_x = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_y = np.cos(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
     def relax_B_dot_mu(self, t, mix_down=0*MHz):
@@ -215,9 +208,9 @@ class Probe(object):
         # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
         t = np.atleast_1d(t)
-        magnitude = self.cells_mu_T*np.sqrt((γₚ*self.cells_B0)**2 + 1/self.material.T2**2)
-        phase = np.arctan(1./(self.material.T2*γₚ*self.cells_B0))
-        omega_mixed = (γₚ*self.cells_B0-2*np.pi*mix_down)
+        magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
+        phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
+        omega_mixed = (self.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
         argument = np.outer(omega_mixed,t) - phase[:, None]
         # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
         # already assumed that dmu_y_dt is 0, so we can leave out that term
@@ -304,8 +297,10 @@ petroleum_jelly = Material(name = "Petroleum Jelly",
                            density = 0.848*g/cm**3,
                            molar_mass = 742.8*g/mol,
                            T1 = 1*s,
-                           T2 = 40*ms)
-
+                           T2 = 40*ms,
+                           gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
+                           )
+print(petroleum_jelly)
 nmr_probe = Probe(length = 30.0*mm,
                   diameter = 1.5*mm,
                   material = petroleum_jelly,
@@ -348,7 +343,7 @@ if False:
 brf = np.array(nmr_coil.B_field(0*mm,0*mm,0*mm))
 brf_m = np.sqrt(np.sum(brf**2, axis=-1))
 print("Brf(0,0,0)", brf_m/T, "T")
-t_90 = np.pi/(2*γₚ*brf_m/2.)
+t_90 = np.pi/(2*petroleum_jelly.gyromagnetic_ratio*brf_m/2.)
 print("t_90", t_90/us, "mus")
 
 t_start = time.time()
