@@ -236,7 +236,7 @@ class Coil(object):
         self.radius = diameter/2.
         self.current = current
 
-    def B_field(self, x, y, z, **kwargs):
+    def B_field(self, x, y, z):
         r"""The magnetic field of the coil
         Assume Biot-Savart law
         vec(B)(vec(r)) = µ0 / 4π ∮ I dvec(L) × vec(r)' / |vec(r)'|³
@@ -253,30 +253,28 @@ class Coil(object):
             - closed loop
             - constant current, can factor out the I from integral
         """
-        current = kwargs.pop("current", self.current)
 
-        # coil path is implemented as perfect helix
-        coil_path_parameter = np.linspace(0, 2*np.pi*self.turns, 1000)
+        phi = np.linspace(0, 2*np.pi*self.turns, 1000)
+        sPhi = np.sin(phi)
+        cPhi = np.cos(phi)
+        lx = self.radius*sPhi
+        ly = self.radius*cPhi
+        lz = self.length/2 * (phi/(np.pi*self.turns)-1)
+        dlx = ly
+        dly = -lx
+        dlz = self.length/(2*np.pi*self.turns)
 
-        lx = lambda phi: self.radius * np.sin(phi)
-        ly = lambda phi: self.radius * np.cos(phi)
-        lz = lambda phi: self.length * phi / (2*np.pi*self.turns) - self.length/2.
+        dist = np.sqrt((lx-x)**2+(ly-y)**2+(lz-z)**2)
 
-        dlx = lambda phi: self.radius * np.cos(phi)
-        dly = lambda phi: -self.radius * np.sin(phi)
-        dlz = lambda phi: self.length / (2*np.pi*self.turns)
+        integrand_x = ( dly * (z-lz) - dlz * (y-ly) ) / dist**3
+        integrand_y = ( dlz * (x-lx) - dlx * (z-lz) ) / dist**3
+        integrand_z = ( dlx * (y-ly) - dly * (x-lx) ) / dist**3
 
-        dist = lambda phi, x, y, z: np.sqrt((lx(phi)-x)**2+(ly(phi)-y)**2+(lz(phi)-z)**2)
+        B_x = µ0/(4*np.pi) * self.current * integrate.simps(integrand_x, x=phi)
+        B_y = µ0/(4*np.pi) * self.current * integrate.simps(integrand_y, x=phi)
+        B_z = µ0/(4*np.pi) * self.current * integrate.simps(integrand_z, x=phi)
 
-        integrand_x = lambda phi, x, y, z: ( dly(phi) * (z-lz(phi)) - dlz(phi) * (y-ly(phi)) ) / dist(phi, x, y, z)**3
-        integrand_y = lambda phi, x, y, z: ( dlz(phi) * (x-lx(phi)) - dlx(phi) * (z-lz(phi)) ) / dist(phi, x, y, z)**3
-        integrand_z = lambda phi, x, y, z: ( dlx(phi) * (y-ly(phi)) - dly(phi) * (x-lx(phi)) ) / dist(phi, x, y, z)**3
-
-        B_x = lambda x, y, z : µ0/(4*np.pi) * current * integrate.quad(lambda phi: integrand_x(phi, x, y, z), 0, 2*np.pi*self.turns)[0]
-        B_y = lambda x, y, z : µ0/(4*np.pi) * current * integrate.quad(lambda phi: integrand_y(phi, x, y, z), 0, 2*np.pi*self.turns)[0]
-        B_z = lambda x, y, z : µ0/(4*np.pi) * current * integrate.quad(lambda phi: integrand_z(phi, x, y, z), 0, 2*np.pi*self.turns)[0]
-
-        return [B_x(x,y,z), B_y(x,y,z), B_z(x,y,z)]
+        return [B_x, B_y, B_z]
 
     def pickup_flux(self, probe, t, mix_down=0*MHz):
         # Φ(t) = Σ N B₂(r) * μ(t) / I

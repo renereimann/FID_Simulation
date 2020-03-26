@@ -10,7 +10,6 @@ Check:
 * t_90 <-> current
 
 Improve Performance:
-* B-Field spule
 * Memory limit cells
 
 Reduce Approximations:
