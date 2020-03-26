@@ -131,93 +131,6 @@ class Material(object):
         return NA * self.density / self.molar_mass
 
 
-class Probe(object):
-    def __init__(self, length, diameter, material, temp, B_field, N_cells, seed):
-        self.length = length
-        self.radius = diameter / 2.
-        self.V_cell = self.length * np.pi * self.radius**2
-
-        self.material = material
-
-        self.temp = temp
-        self.B_field = B_field
-
-        self.rng = np.random.RandomState(seed)
-        self.N_cells = N_cells
-
-        self.initialize_cells(self.N_cells)
-
-    def initialize_cells(self, N_cells):
-        # place cells
-        r = np.sqrt(self.rng.uniform(0,self.radius**2, size=N_cells))
-        phi = self.rng.uniform(0, 2*np.pi, size=N_cells)
-        self.cells_x = r*np.sin(phi)
-        self.cells_y = r*np.cos(phi)
-        self.cells_z = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
-
-        # calculate quantities of cells
-        B0 = np.array([self.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
-        self.cells_B0_x = B0[:,0]
-        self.cells_B0_y = B0[:,1]
-        self.cells_B0_z = B0[:,2]
-        self.cells_B0 = np.sqrt(np.sum(B0**2, axis=-1))
-
-        expon = self.material.magnetic_moment * self.cells_B0 / (kB*self.temp)
-        self.cells_nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
-        self.cells_magnetization = self.material.magnetic_moment * self.material.number_density * self.cells_nuclear_polarization
-        # dipoles are aligned with the external field at the beginning
-        self.cells_dipole_moment_mag = self.cells_magnetization * self.V_cell/N_cells
-
-    def apply_rf_field(self, rf_field, time):
-        # clculate B-field from coil for each cell
-        B1 = np.array([rf_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
-        self.cells_B1_x = B1[:,0]
-        self.cells_B1_y = B1[:,1]
-        self.cells_B1_z = B1[:,2]
-        self.cells_B1 = np.sqrt(np.sum(B1**2, axis=-1))
-
-        # aproximation
-        self.cells_mu_x = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_y = np.cos(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
-
-    def relax_B_dot_mu(self, t, mix_down=0*MHz):
-        # flux in pickup coil depends on d/dt(B × μ)
-        # --> y component static, no induction, does not contribute
-
-        # d/dt ( μₜ sin(γₚ |B0| t) exp(-t/T2) )
-        #       = μₜ [ d/dt( sin(γₚ |B0| t) ) exp(-t/T2) + sin(γₚ |B0| t) d/dt( exp(-t/T2) )]
-        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) exp(-t/T2) + sin(γₚ |B0| t) (-1/T2) exp(-t/T2) ]
-        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) -1/T2 * sin(γₚ |B0| t) ] exp(-t/T2)
-        # make use of Addition theorem a cos(α) + b sin(α) = √(a² + b²) cos(α - arctan(-b/a))
-        #       = μₜ √(γₚ² |B0|² + 1/T2²) cos(γₚ |B0| t - arctan(1/(T2γₚ |B0|)) exp(-t/T2)
-
-        # a mix down_frequency can be propergated through and will effect the
-        # individual cells, all operations before are linear
-        # Note the mix down will only effect the
-
-        # straight forward implementation
-        # very inefficient
-        # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0-mix_down)*t)*np.exp(-t/self.material.T2)
-        # dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0)**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0)))*np.exp(-t/self.material.T2)
-        # mu_y = lambda cell : cell.mu_z
-        # dmu_y_dt = lambda cell: 0
-        # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0-mix_down)*t)*np.exp(-t/self.material.T2)
-        # dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0)**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0)))*np.exp(-t/self.material.T2)
-        # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
-
-        t = np.atleast_1d(t)
-        magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
-        phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
-        omega_mixed = (self.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
-        argument = np.outer(omega_mixed,t) - phase[:, None]
-        # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
-        # already assumed that dmu_y_dt is 0, so we can leave out that term
-        B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
-        return np.sum(B_x_dmu_dt, axis=0)
-
-
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
 
@@ -277,19 +190,117 @@ class Coil(object):
 
         return [B_x, B_y, B_z]
 
-    def pickup_flux(self, probe, t, mix_down=0*MHz):
+
+class Probe(object):
+    def __init__(self, length, diameter, material, temp, B_field, coil, N_cells, seed):
+        self.length = length
+        self.radius = diameter / 2.
+        self.V_cell = self.length * np.pi * self.radius**2
+
+        self.material = material
+
+        self.temp = temp
+        self.B_field = B_field
+        self.coil = coil
+
+        self.rng = np.random.RandomState(seed)
+        self.N_cells = N_cells
+
+        self.initialize_cells(self.N_cells)
+
+    def initialize_cells(self, N_cells):
+        # place cells
+        r = np.sqrt(self.rng.uniform(0,self.radius**2, size=N_cells))
+        phi = self.rng.uniform(0, 2*np.pi, size=N_cells)
+        self.cells_x = r*np.sin(phi)
+        self.cells_y = r*np.cos(phi)
+        self.cells_z = self.rng.uniform(-self.length/2., self.length/2., size=N_cells)
+
+        # calculate quantities of cells
+        B0 = np.array([self.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
+        self.cells_B0_x = B0[:,0]
+        self.cells_B0_y = B0[:,1]
+        self.cells_B0_z = B0[:,2]
+        self.cells_B0 = np.sqrt(np.sum(B0**2, axis=-1))
+
+        expon = self.material.magnetic_moment * self.cells_B0 / (kB*self.temp)
+        self.cells_nuclear_polarization = (np.exp(expon) - np.exp(-expon))/(np.exp(expon) + np.exp(-expon))
+        self.cells_magnetization = self.material.magnetic_moment * self.material.number_density * self.cells_nuclear_polarization
+        # dipoles are aligned with the external field at the beginning
+        self.cells_dipole_moment_mag = self.cells_magnetization * self.V_cell/N_cells
+
+    def initialize_coil_field(self):
+        # clculate B-field from coil for each cell
+        B1 = np.array([self.coil.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
+        self.cells_B1_x = B1[:,0]
+        self.cells_B1_y = B1[:,1]
+        self.cells_B1_z = B1[:,2]
+        self.cells_B1 = np.sqrt(np.sum(B1**2, axis=-1))
+
+    def apply_rf_field(self, time):
+        if not hasattr(self, "cells_B1"):
+            self.initialize_coil_field()
+
+        # aproximation
+        self.cells_mu_x = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_y = np.cos(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+
+    def t_90(self):
+        brf = self.coil.B_field(0*mm,0*mm,0*mm)
+        # B1 field strength is half of RF field
+        b1 = np.sqrt(brf[0]**2+brf[1]**2+brf[2]**2)/2.
+        t_90 = (np.pi/2)/(self.material.gyromagnetic_ratio*b1)
+        return t_90
+
+    def pickup_flux(self, t, mix_down=0*MHz):
         # Φ(t) = Σ N B₂(r) * μ(t) / I
         # a mix down_frequency can be propergated through and will effect the
         # individual cells
-        return self.turns * probe.relax_B_dot_mu(t, mix_down=mix_down) / self.current
+
+        # flux in pickup coil depends on d/dt(B × μ)
+        # --> y component static, no induction, does not contribute
+
+        # d/dt ( μₜ sin(γₚ |B0| t) exp(-t/T2) )
+        #       = μₜ [ d/dt( sin(γₚ |B0| t) ) exp(-t/T2) + sin(γₚ |B0| t) d/dt( exp(-t/T2) )]
+        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) exp(-t/T2) + sin(γₚ |B0| t) (-1/T2) exp(-t/T2) ]
+        #       = μₜ [ γₚ |B0| cos(γₚ |B0| t) -1/T2 * sin(γₚ |B0| t) ] exp(-t/T2)
+        # make use of Addition theorem a cos(α) + b sin(α) = √(a² + b²) cos(α - arctan(-b/a))
+        #       = μₜ √(γₚ² |B0|² + 1/T2²) cos(γₚ |B0| t - arctan(1/(T2γₚ |B0|)) exp(-t/T2)
+
+        # a mix down_frequency can be propergated through and will effect the
+        # individual cells, all operations before are linear
+        # Note the mix down will only effect the
+
+        # straight forward implementation
+        # very inefficient
+        # mu_x = lambda cell : cell.mu_T*np.sin((γₚ*cell.B0-mix_down)*t)*np.exp(-t/self.material.T2)
+        # dmu_x_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0)**2 + 1/self.material.T2**2)*np.cos((γₚ*cell.B0-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0)))*np.exp(-t/self.material.T2)
+        # mu_y = lambda cell : cell.mu_z
+        # dmu_y_dt = lambda cell: 0
+        # mu_z = lambda cell : cell.mu_T*np.cos((γₚ*cell.B0-mix_down)*t)*np.exp(-t/self.material.T2)
+        # dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0)**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0)))*np.exp(-t/self.material.T2)
+        # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
+
+        t = np.atleast_1d(t)
+        magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
+        phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
+        omega_mixed = (self.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+        argument = np.outer(omega_mixed,t) - phase[:, None]
+        # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
+        # already assumed that dmu_y_dt is 0, so we can leave out that term
+        B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
+        return self.coil.turns * np.sum(B_x_dmu_dt, axis=0) / self.coil.current
 
 ################################################################################
-# that about motion / diffusion within material
-# what about other components of the probe
-# what about spin-spin interactions
+# setup
 
-B0 = PermanentMagnet( 1.45*T )
-B0.An[8] = 5e-6*B0.An[2]/cm
+impedance = 50 * ohm
+guete = 1.1
+pulse_power = 10*W
+current = guete * np.sqrt(2*pulse_power/impedance)
+print("I =", current/A, "A")
 
 # values from wolframalpha.com
 petroleum_jelly = Material(name = "Petroleum Jelly",
@@ -301,23 +312,46 @@ petroleum_jelly = Material(name = "Petroleum Jelly",
                            gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
                            )
 print(petroleum_jelly)
+
+# external field
+B0 = PermanentMagnet( 1.45*T )
+B0.An[8] = 5e-6*B0.An[2]/cm
+
+# NMR Coil
+nmr_coil = Coil(turns=30,
+               length=15.0*mm,
+               diameter=4.6*mm,
+               current=current)
+
+# NMR Probe
 nmr_probe = Probe(length = 30.0*mm,
                   diameter = 1.5*mm,
                   material = petroleum_jelly,
                   temp = (273.15 + 26.85) * K,
                   B_field = B0,
+                  coil = nmr_coil,
                   N_cells = 1000,
                   seed = 12345)
-impedance = 50 * ohm
-guete = 0.60
-pulse_power = 10*W
-current = guete * np.sqrt(2*pulse_power/impedance)
-print("I =", current/A, "A")
 
-nmr_coil = Coil(turns=30,
-               length=15.0*mm,
-               diameter=4.6*mm,
-               current=current)
+################################################################################
+# calculation
+
+# apply RF field
+t_90 = nmr_probe.t_90()
+print("t_90", t_90/us, "mus")
+
+t_start = time.time()
+nmr_probe.apply_rf_field(t_90)
+print("Needed", (time.time()-t_start), "sec to calculate RF field.")
+
+# calculate FID
+times = np.linspace(0*ms, 10*ms, 10000)
+t_start = time.time()
+flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
+print("Needed", time.time()-t_start, "sec to calculate FID.")
+
+################################################################################
+# plotting
 
 if False:
     # make a plot for comparison
@@ -334,22 +368,6 @@ if False:
     plt.tight_layout()
     plt.savefig("./plots/coil_field_distribution.pdf", bbox_inches="tight")
 
-########################################################################################
-
-# apply RF field
-# B1 field strength of RF field
-# for time of t_pi2 = pi/(2 gamma B1)
-brf = np.array(nmr_coil.B_field(0*mm,0*mm,0*mm))
-brf_m = np.sqrt(np.sum(brf**2, axis=-1))
-print("Brf(0,0,0)", brf_m/T, "T")
-t_90 = np.pi/(2*petroleum_jelly.gyromagnetic_ratio*brf_m/2.)
-print("t_90", t_90/us, "mus")
-
-t_start = time.time()
-nmr_probe.apply_rf_field(nmr_coil.B_field, t_90)
-t_stop = time.time()
-print("Needed", (t_stop-t_start), "seconds to apply RF field.")
-
 if False:
     zs = np.linspace(-15*mm, 15*mm, 1000)
     cross_check = np.genfromtxt("./mu_y_vs_z.txt", delimiter=" ")
@@ -365,16 +383,6 @@ if False:
     plt.tight_layout()
     plt.savefig("./plots/magnitization_after_pi2_pulse.pdf", bbox_inches="tight")
     plt.show()
-
-####################################################################################
-
-times = np.linspace(0*ms, 10*ms, 10000)
-print("Start calculating FID")
-t_start = time.time()
-flux = nmr_coil.pickup_flux(nmr_probe, times, mix_down=61.74*MHz)
-t_stop = time.time()
-print("Needed", t_stop-t_start, "sec to calculate FID.")
-print("Needed", (t_stop-t_start)/10000., "per t point.")
 
 if True:
     fig, ax = plt.subplots()
@@ -406,6 +414,10 @@ if True:
     plt.show()
 
 """
+# that about motion / diffusion within material
+# what about other components of the probe
+# what about spin-spin interactions
+
 
 # would have to solve Bloch Equations
 #                             ( B_RF sin(omega*t) )
