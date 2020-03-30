@@ -286,6 +286,12 @@ class Probe(object):
         # dmu_z_dt = lambda cell: cell.mu_T*np.sqrt((γₚ*cell.B0)**2 + 1/self.material.T2**2)*np.sin((γₚ*cell.B0-mix_down)*t - np.arctan(1/(self.material.T2*(γₚ*cell.B0)))*np.exp(-t/self.material.T2)
         # return np.sum( [cell.B1.x * dmu_x_dt(cell) + cell.B1.y * dmu_y_dt(cell) + cell.B1.z * dmu_z_dt(cell) for cell in self.cells] )
 
+        # From Faradays law we have
+        # EMF = - d/dt (N * B * A)
+        #     with vec(B)(t) = mu0 * vec(M)(t) = mu0 * M0 * vec(mu)(t)
+        #     with vec(A) = pi*r^2 * vec(B_coil)/<B_coil>
+        # EMF = N * pi * r^2 * mu0 * sum( vec(B_coil)/<B_coil> * M0 * d/dt( vec(mu)(t) ) )
+
         t = np.atleast_1d(t)
         magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
         phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
