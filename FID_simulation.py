@@ -14,7 +14,7 @@ import numpy as np
 from scipy import integrate
 from scipy import fftpack
 from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
-from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, V
+from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
@@ -128,7 +128,10 @@ class Material(object):
 
     @property
     def number_density(self):
-        return NA * self.density / self.molar_mass
+        # NA * density / molar_mass
+        # the package numericalunits already converts "mol" using the Avrogardo
+        # constant thus we do not need the extra factor if using numericalunits
+        return self.density / self.molar_mass
 
 
 class Coil(object):
@@ -291,7 +294,8 @@ class Probe(object):
         # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
         # already assumed that dmu_y_dt is 0, so we can leave out that term
         B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
-        return self.coil.turns * np.sum(B_x_dmu_dt, axis=0) / self.coil.current
+        #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+        return self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None])
 
 
 class Noise(object):
@@ -321,14 +325,17 @@ class Noise(object):
         N = len(times)
         rand_noise = rng.normal(loc=0.0, scale=scale, size=N)
         freq = np.fft.fftfreq(N, d=times[1]-times[0])
-        fft  = fftpack.fft(rand_noise)*np.power(np.abs(freq), 0.5*self.freq_power)
-        fft[~np.isfinite(fft)] = 0
+        fft  = fftpack.fft(rand_noise)
+        fft[freq!=0] *= np.power(np.abs(freq[freq!=0]), 0.5*self.freq_power)
+        fft[freq==0] = 0
         noise = fftpack.ifft(fft)
         return np.real(noise)
 
     def __call__(self, times, rng=None, scale=1.0):
         noise = self.get_freq_noise(times, rng=rng, scale=scale)
         return noise
+
+
 ################################################################################
 # setup
 
@@ -389,7 +396,7 @@ t_start = time.time()
 flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
 print("Needed", time.time()-t_start, "sec to calculate FID.")
 
-flux_noise = 10000.*noise(times)*(T*MHz/A)
+flux_noise = noise(times)*0.001*V
 flux += flux_noise
 
 N = len(times)                # Number of samplepoints
@@ -440,16 +447,16 @@ if False:
 
 if True:
     fig, ax = plt.subplots()
-    ax.plot(times/ms, flux/(T*MHz/A))
-    ax.plot(times/ms, flux_noise/(T*MHz/A))
+    ax.plot(times/ms, flux/mV)
+    ax.plot(times/ms, flux_noise/mV)
     ax.set_xlabel("t / ms")
     ax.set_xlim([0, 10])
-    ax.set_ylabel("flux through coil / (T*MHz/A)")
+    ax.set_ylabel("induced voltage in coil / mV")
     plt.tight_layout()
     axins = inset_axes(ax, width="60%",  height="30%", loc=1)
-    axins.plot(times/ms, flux/(T*MHz/A))
+    axins.plot(times/ms, flux/mV)
     axins.set_xlim([1.8, 2.8])
-    axins.set_ylim([-4000, 4000])
+    axins.set_ylim([-1, 1])
     axins.yaxis.get_major_locator().set_params(nbins=7)
     axins.xaxis.get_major_locator().set_params(nbins=7)
     plt.xticks(visible=False)
