@@ -14,7 +14,7 @@ import numpy as np
 from scipy import integrate
 from scipy import fftpack
 from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
-from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV
+from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV, uV
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
@@ -293,15 +293,34 @@ class Probe(object):
         # EMF = N * pi * r^2 * mu0 * sum( vec(B_coil)/<B_coil> * M0 * d/dt( vec(mu)(t) ) )
 
         t = np.atleast_1d(t)
+
         magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
         phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
         omega_mixed = (self.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
-        argument = np.outer(omega_mixed,t) - phase[:, None]
-        # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
-        # already assumed that dmu_y_dt is 0, so we can leave out that term
-        B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
-        #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
-        return self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None])
+
+        max_memory = 10000000
+        N_cells = len(self.cells_B0)
+        results = []
+        idx_end = 0
+        while idx_end != -1:
+            idx_start = idx_end
+            this_t = None
+            if N_cells* len(t[idx_start:]) > max_memory:
+                idx_end = idx_start + max_memory//N_cells
+                this_t = t[idx_start:idx_end]
+            else:
+                idx_end = -1
+                this_t = t[idx_start:]
+
+            print(idx_start, idx_end)
+            argument = np.outer(omega_mixed,this_t) - phase[:, None]
+            # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
+            # already assumed that dmu_y_dt is 0, so we can leave out that term
+            B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.material.T2)[:, None]).T
+            #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+            results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None]))
+        results = np.concatenate(results)/N_cells
+        return results
 
 
 class Noise(object):
@@ -379,7 +398,7 @@ nmr_probe = Probe(length = 30.0*mm,
                   temp = (273.15 + 26.85) * K,
                   B_field = B0,
                   coil = nmr_coil,
-                  N_cells = 1000,
+                  N_cells = 10000,
                   seed = 12345)
 
 noise = Noise()
@@ -402,7 +421,7 @@ t_start = time.time()
 flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
 print("Needed", time.time()-t_start, "sec to calculate FID.")
 
-flux_noise = noise(times)*0.001*V
+flux_noise = noise(times)*0.001*mV
 flux += flux_noise
 
 N = len(times)                # Number of samplepoints
@@ -453,14 +472,15 @@ if False:
 
 if True:
     fig, ax = plt.subplots()
-    ax.plot(times/ms, flux/mV)
-    ax.plot(times/ms, flux_noise/mV)
+    ax.plot(times/ms, flux/uV)
+    ax.plot(times/ms, flux_noise/uV)
     ax.set_xlabel("t / ms")
     ax.set_xlim([0, 10])
-    ax.set_ylabel("induced voltage in coil / mV")
+    ax.set_ylabel("induced voltage in coil / $\mu$V")
     plt.tight_layout()
     axins = inset_axes(ax, width="60%",  height="30%", loc=1)
-    axins.plot(times/ms, flux/mV)
+    axins.plot(times/ms, flux/uV)
+    axins.plot(times/ms, flux_noise/uV)
     axins.set_xlim([1.8, 2.8])
     axins.set_ylim([-1, 1])
     axins.yaxis.get_major_locator().set_params(nbins=7)
