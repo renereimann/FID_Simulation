@@ -293,6 +293,42 @@ class Probe(object):
         B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-t/self.material.T2)[:, None]).T
         return self.coil.turns * np.sum(B_x_dmu_dt, axis=0) / self.coil.current
 
+
+class Noise(object):
+    r"""Class to generate noise and drift for time series. We plan to support
+    different kind of noise and drift.
+    """
+
+    def __init__(self, freq_power=-1, drift_lin=None, drift_exp=None, rng=None):
+        r"""Creates a Noise object that can be called to generate noise for time
+        series.
+
+        Parameters:
+            - freq_power = Power of the f^alpha Power density spectrum. Default 1
+            - drift_lin = strength of linear drift
+            - drift_exp = strength of exponential dirft
+            - rng = RandomState object used to generate random numbers.
+        """
+        self.freq_power = freq_power
+        self.drift_lin = drift_lin
+        self.drift_exp = drift_exp
+        self.rng = rng
+        if self.rng is None:
+            self.rng = np.random.RandomState()
+
+    def get_freq_noise(self, times, rng=None, scale=1.0):
+        if rng is None: rng = self.rng
+        N = len(times)
+        rand_noise = rng.normal(loc=0.0, scale=scale, size=N)
+        freq = np.fft.fftfreq(N, d=times[1]-times[0])
+        fft  = fftpack.fft(rand_noise)*np.power(np.abs(freq), 0.5*self.freq_power)
+        fft[~np.isfinite(fft)] = 0
+        noise = fftpack.ifft(fft)
+        return np.real(noise)
+
+    def __call__(self, times, rng=None, scale=1.0):
+        noise = self.get_freq_noise(times, rng=rng, scale=scale)
+        return noise
 ################################################################################
 # setup
 
@@ -333,6 +369,7 @@ nmr_probe = Probe(length = 30.0*mm,
                   N_cells = 1000,
                   seed = 12345)
 
+noise = Noise()
 ################################################################################
 # calculation
 
@@ -345,11 +382,28 @@ nmr_probe.apply_rf_field(t_90)
 print("Needed", (time.time()-t_start), "sec to calculate RF field.")
 
 # calculate FID
-times = np.linspace(0*ms, 10*ms, 10000)
+# trolly: 1 MSPS
+# fix probes: 10 MSPS --> totally oversampled
+times = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
 t_start = time.time()
 flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
 print("Needed", time.time()-t_start, "sec to calculate FID.")
 
+flux_noise = 10000.*noise(times)*(T*MHz/A)
+flux += flux_noise
+
+N = len(times)                # Number of samplepoints
+yf = fftpack.fft(flux)
+xf = np.linspace(0.0, 1.0/(2.0*(times[1]-times[0]))/kHz, N/2)
+"""
+hilbert = fftpack.ifft(complex(0,-1)*np.sign(xf)*yf)
+print(hilbert)
+print(hilbert/yf)
+phi = np.arctan(hilbert/yf)
+plt.figure()
+plt.plot(times/ms, phi)
+"""
+# 2.0/N * np.abs(yf[:N//2])
 ################################################################################
 # plotting
 
@@ -387,6 +441,7 @@ if False:
 if True:
     fig, ax = plt.subplots()
     ax.plot(times/ms, flux/(T*MHz/A))
+    ax.plot(times/ms, flux_noise/(T*MHz/A))
     ax.set_xlabel("t / ms")
     ax.set_xlim([0, 10])
     ax.set_ylabel("flux through coil / (T*MHz/A)")
@@ -402,9 +457,7 @@ if True:
     mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
     fig.savefig("./plots/FID_signal.pdf", bbox_inches="tight")
 
-    N = len(times)                # Number of samplepoints
-    yf = fftpack.fft(flux)
-    xf = np.linspace(0.0, 1.0/(2.0*(times[1]-times[0]))/kHz, N/2)
+
     fig = plt.figure()
     plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
     plt.xlabel("f / kHz")
