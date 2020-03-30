@@ -312,7 +312,6 @@ class Probe(object):
                 idx_end = -1
                 this_t = t[idx_start:]
 
-            print(idx_start, idx_end)
             argument = np.outer(omega_mixed,this_t) - phase[:, None]
             # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
             # already assumed that dmu_y_dt is 0, so we can leave out that term
@@ -328,7 +327,8 @@ class Noise(object):
     different kind of noise and drift.
     """
 
-    def __init__(self, freq_power=-1, drift_lin=None, drift_exp=None, rng=None):
+    def __init__(self, white_noise=None, freq_power=None, drift_lin=None,
+                 drift_exp=None, drift_exp_time=None, rng=None):
         r"""Creates a Noise object that can be called to generate noise for time
         series.
 
@@ -339,14 +339,15 @@ class Noise(object):
             - rng = RandomState object used to generate random numbers.
         """
         self.freq_power = freq_power
+        self.white_noise = white_noise
         self.drift_lin = drift_lin
         self.drift_exp = drift_exp
+        self.drift_exp_time = drift_exp_time
         self.rng = rng
         if self.rng is None:
             self.rng = np.random.RandomState()
 
-    def get_freq_noise(self, times, rng=None, scale=1.0):
-        if rng is None: rng = self.rng
+    def get_freq_noise(self, times, rng, scale=1.0):
         N = len(times)
         rand_noise = rng.normal(loc=0.0, scale=scale, size=N)
         freq = np.fft.fftfreq(N, d=times[1]-times[0])
@@ -356,8 +357,26 @@ class Noise(object):
         noise = fftpack.ifft(fft)
         return np.real(noise)
 
+    def get_white_noise(self, times, rng):
+        return rng.normal(loc=0.0, scale=self.white_noise)
+
+    def get_linear_drift(self, times):
+        return times*self.drift_lin
+
+    def get_exp_drift(self, times):
+        return  self.drift_exp*np.exp(-times/self.drift_exp_time)
+
     def __call__(self, times, rng=None, scale=1.0):
-        noise = self.get_freq_noise(times, rng=rng, scale=scale)
+        if rng is None: rng = self.rng
+        noise = np.zeros_like(times)
+        if self.freq_power is not None:
+            noise += self.get_freq_noise(times, rng=rng, scale=scale)
+        if self.white_noise is not None:
+            noise += self.get_white_noise(times, rng=rng)
+        if self.drift_lin is not None:
+            noise += self.get_linear_drift(times)
+        if self.drift_exp is not None and self.drift_exp_time is not None:
+            noise += self.get_exp_drift(times)
         return noise
 
 
@@ -401,7 +420,7 @@ nmr_probe = Probe(length = 30.0*mm,
                   N_cells = 10000,
                   seed = 12345)
 
-noise = Noise()
+noise = Noise(white_noise=1*uV, )
 ################################################################################
 # calculation
 
@@ -421,7 +440,7 @@ t_start = time.time()
 flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
 print("Needed", time.time()-t_start, "sec to calculate FID.")
 
-flux_noise = noise(times)*0.001*mV
+flux_noise = noise(times, scale=0.001*mV)
 flux += flux_noise
 
 N = len(times)                # Number of samplepoints
