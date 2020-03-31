@@ -18,6 +18,8 @@ from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV, uV
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm as mcolors
 
 ################################################################################
 
@@ -327,7 +329,8 @@ class Noise(object):
     different kind of noise and drift.
     """
 
-    def __init__(self, white_noise=None, freq_power=None, drift_lin=None,
+    def __init__(self, white_noise=None, freq_power=None, scale_freq=None,
+                 drift_lin=None,
                  drift_exp=None, drift_exp_time=None, rng=None):
         r"""Creates a Noise object that can be called to generate noise for time
         series.
@@ -339,6 +342,7 @@ class Noise(object):
             - rng = RandomState object used to generate random numbers.
         """
         self.freq_power = freq_power
+        self.scale_freq = scale_freq
         self.white_noise = white_noise
         self.drift_lin = drift_lin
         self.drift_exp = drift_exp
@@ -347,9 +351,9 @@ class Noise(object):
         if self.rng is None:
             self.rng = np.random.RandomState()
 
-    def get_freq_noise(self, times, rng, scale=1.0):
+    def get_freq_noise(self, times, rng):
         N = len(times)
-        rand_noise = rng.normal(loc=0.0, scale=scale, size=N)
+        rand_noise = rng.normal(loc=0.0, scale=self.scale_freq, size=N)
         freq = np.fft.fftfreq(N, d=times[1]-times[0])
         fft  = fftpack.fft(rand_noise)
         fft[freq!=0] *= np.power(np.abs(freq[freq!=0]), 0.5*self.freq_power)
@@ -366,11 +370,11 @@ class Noise(object):
     def get_exp_drift(self, times):
         return  self.drift_exp*np.exp(-times/self.drift_exp_time)
 
-    def __call__(self, times, rng=None, scale=1.0):
+    def __call__(self, times, rng=None):
         if rng is None: rng = self.rng
         noise = np.zeros_like(times)
-        if self.freq_power is not None:
-            noise += self.get_freq_noise(times, rng=rng, scale=scale)
+        if self.freq_power is not None and self.scale_freq is not None:
+            noise += self.get_freq_noise(times, rng=rng)
         if self.white_noise is not None:
             noise += self.get_white_noise(times, rng=rng)
         if self.drift_lin is not None:
@@ -420,7 +424,7 @@ nmr_probe = Probe(length = 30.0*mm,
                   N_cells = 10000,
                   seed = 12345)
 
-noise = Noise(white_noise=1*uV, )
+noise = Noise(freq_power=-1, scale_freq=3*uV)
 ################################################################################
 # calculation
 
@@ -432,6 +436,26 @@ t_start = time.time()
 nmr_probe.apply_rf_field(t_90)
 print("Needed", (time.time()-t_start), "sec to calculate RF field.")
 
+if True:
+    fig, ax = plt.subplots(ncols=2)
+    ax[0].scatter(nmr_probe.cells_x/mm, nmr_probe.cells_y/mm, c=(nmr_probe.cells_B0-1.45*T)/T, cmap="jet")
+    ax[0].set_aspect("equal")
+    ax[1].scatter(nmr_probe.cells_z/mm, nmr_probe.cells_y/mm, c=(nmr_probe.cells_B0-1.45*T)/T, cmap="jet")
+    ax[1].set_aspect("equal")
+
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    X = (nmr_probe.cells_B0-1.45*T)/T
+    my_col = mcolors.seismic((X-np.amin(X))/(np.amax(X)-np.amin(X)))
+    ax.scatter(nmr_probe.cells_x/mm, nmr_probe.cells_y/mm, nmr_probe.cells_z/mm, c=my_col, marker="o")
+    ax.set_xlim(-20,20)
+    ax.set_ylim(-20,20)
+    ax.set_zlim(-20,20)
+    plt.show()
+
+exit()
+
 # calculate FID
 # trolly: 1 MSPS
 # fix probes: 10 MSPS --> totally oversampled
@@ -440,21 +464,21 @@ t_start = time.time()
 flux = nmr_probe.pickup_flux(times, mix_down=61.74*MHz)
 print("Needed", time.time()-t_start, "sec to calculate FID.")
 
-flux_noise = noise(times, scale=0.001*mV)
+flux_noise = noise(times)
 flux += flux_noise
 
 N = len(times)                # Number of samplepoints
-yf = fftpack.fft(flux)
+windowFunction = {"Hann": lambda nN: (np.sin(np.pi*nN))**2,
+                  "Rectangular": lambda nN: 1,
+                  "Triangular": lambda nN: 1-np.abs(2*nN - 1),
+                  "Welch": lambda nN: 1 - (2*nN-1)**2,
+                  "sine": lambda nN: np.sin(np.pi*nN),
+                  "Blackman": lambda nN: 7938/18608 - 9240/18608 * np.cos(2*np.pi*nN) + 1430/18608*np.cos(4*np.pi*nN),
+                  "Nuttal": lambda nN: 0.355768-0.487396*np.cos(2*np.pi*nN) +0.144232*np.cos(4*np.pi*nN) - 0.012604 *np.cos(6*np.pi*nN),
+                  "Blackman-Nuttal": lambda nN: 0.3635819-0.4891775*np.cos(2*np.pi*nN) +0.1365995*np.cos(4*np.pi*nN) - 0.0106411 *np.cos(6*np.pi*nN),
+                  }
+yf = fftpack.fft(flux*windowFunction[""](np.linspace(0,1,len(flux))))
 xf = np.linspace(0.0, 1.0/(2.0*(times[1]-times[0]))/kHz, N/2)
-"""
-hilbert = fftpack.ifft(complex(0,-1)*np.sign(xf)*yf)
-print(hilbert)
-print(hilbert/yf)
-phi = np.arctan(hilbert/yf)
-plt.figure()
-plt.plot(times/ms, phi)
-"""
-# 2.0/N * np.abs(yf[:N//2])
 ################################################################################
 # plotting
 
@@ -493,6 +517,7 @@ if True:
     fig, ax = plt.subplots()
     ax.plot(times/ms, flux/uV)
     ax.plot(times/ms, flux_noise/uV)
+    ax.plot(times/ms, (np.sin(np.pi*np.linspace(0,1,len(flux))))**2)
     ax.set_xlabel("t / ms")
     ax.set_xlim([0, 10])
     ax.set_ylabel("induced voltage in coil / $\mu$V")
@@ -516,7 +541,20 @@ if True:
     plt.xlim([0, 1.0/(2.0*(times[1]-times[0]))/kHz])
     plt.ylabel("|FFT(f)|")
     plt.tight_layout()
+
+
+    fig = plt.figure()
+    mix_down = 61.74*MHz
+    plt.hist((nmr_probe.material.gyromagnetic_ratio*nmr_probe.cells_B0 -2*np.pi*mix_down)/(2*np.pi*kHz))
     plt.show()
+
+if True:
+    hilbert = fftpack.ifft(complex(0,-1)*np.sign(xf)*yf)
+    print(hilbert)
+    print(hilbert/yf)
+    phi = np.arctan(hilbert/yf)
+    plt.figure()
+    plt.plot(times/ms, phi)
 
 """
 # that about motion / diffusion within material
