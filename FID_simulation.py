@@ -23,7 +23,7 @@ from matplotlib import cm as mcolors
 
 ################################################################################
 
-class PermanentMagnet(object):
+class SuperconductingMagnet(object):
     def __init__(self, B0):
         self.An = self.P = { # dipoles
                    1: 0*T,
@@ -387,42 +387,42 @@ class Noise(object):
 ################################################################################
 # setup
 
+class StorageRingMagnet(SuperconductingMagnet):
+    def __init__(self, B0=1.45*T):
+        super().__init__(B0)
+
+class FixedProbe(Probe):
+    def __init__(self, B_field, N_cells=1000, seed=12345):
+        petroleum_jelly = Material(name = "Petroleum Jelly",
+                                   formula = "C40H46N4O10",
+                                   density = 0.848*g/cm**3,
+                                   molar_mass = 742.8*g/mol,
+                                   T1 = 1*s,
+                                   T2 = 40*ms,
+                                   gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
+                                   )
+
+        fix_probe_coil = Coil(turns=30,
+                              length=15.0*mm,
+                              diameter=4.6*mm,
+                              current=0.7*A)
+
+        super().__init__(length = 30.0*mm,
+                         diameter = 1.5*mm,
+                         material = petroleum_jelly,
+                         temp = (273.15 + 26.85) * K,
+                         B_field = B_field,
+                         coil = fix_probe_coil,
+                         N_cells = N_cells,
+                         seed = seed)
+
+external_field = StorageRingMagnet( )
+external_field.An[8] = 5e-6*external_field.An[2]/cm
+nmr_probe = FixedProbe(B_field=external_field)
 impedance = 50 * ohm
 guete = 1.1
 pulse_power = 10*W
-current = guete * np.sqrt(2*pulse_power/impedance)
-print("I =", current/A, "A")
-
-# values from wolframalpha.com
-petroleum_jelly = Material(name = "Petroleum Jelly",
-                           formula = "C40H46N4O10",
-                           density = 0.848*g/cm**3,
-                           molar_mass = 742.8*g/mol,
-                           T1 = 1*s,
-                           T2 = 40*ms,
-                           gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
-                           )
-print(petroleum_jelly)
-
-# external field
-B0 = PermanentMagnet( 1.45*T )
-B0.An[8] = 5e-6*B0.An[2]/cm
-
-# NMR Coil
-nmr_coil = Coil(turns=30,
-               length=15.0*mm,
-               diameter=4.6*mm,
-               current=current)
-
-# NMR Probe
-nmr_probe = Probe(length = 30.0*mm,
-                  diameter = 1.5*mm,
-                  material = petroleum_jelly,
-                  temp = (273.15 + 26.85) * K,
-                  B_field = B0,
-                  coil = nmr_coil,
-                  N_cells = 10000,
-                  seed = 12345)
+nmr_probe.coil.current = guete * np.sqrt(2*pulse_power/impedance)
 
 noise = Noise(freq_power=-1, scale_freq=3*uV)
 ################################################################################
