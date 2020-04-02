@@ -9,19 +9,11 @@
 ################################################################################
 # Import first
 
-import time
 import numpy as np
 from scipy import integrate
 from scipy import fftpack
-from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
-from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV, uV
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm as mcolors
-
-################################################################################
+from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
+from numericalunits import T, K, g, mol, A, uV, mV, V
 
 class SuperconductingMagnet(object):
     def __init__(self, B0):
@@ -34,7 +26,7 @@ class SuperconductingMagnet(object):
                    5: 0*T/mm,
                    6: 0*T/mm,
                    7: 0*T/mm,
-                   8: 0*T/cm,
+                   8: 0*T/mm,
                    # sextupoles
                    9: 0*T/mm**2,
                   10: 0*T/mm**2,
