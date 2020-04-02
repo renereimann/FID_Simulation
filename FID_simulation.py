@@ -254,7 +254,7 @@ class Probe(object):
         t_90 = (np.pi/2)/(self.material.gyromagnetic_ratio*b1)
         return t_90
 
-    def pickup_flux(self, t, mix_down=0*MHz):
+    def pickup_flux(self, t, mix_down=0*MHz, useAverage=True):
         # Φ(t) = Σ N B₂(r) * μ(t) / I
         # a mix down_frequency can be propergated through and will effect the
         # individual cells
@@ -314,9 +314,89 @@ class Probe(object):
             # already assumed that dmu_y_dt is 0, so we can leave out that term
             B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
-            results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None]))
+            if useAverage:
+                results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None]))
+            else:
+                results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None]/self.cells_B1[:, None], axis=0) * np.pi * self.coil.radius**2)
         results = np.concatenate(results)/N_cells
         return results
+
+    def pickup_flux2(self, t, mix_down=0*MHz):
+        t = np.atleast_1d(t)
+
+        magnitude = self.cells_mu_T*np.sqrt((self.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.material.T2**2)
+        phase = np.arctan(1./(self.material.T2*self.material.gyromagnetic_ratio*self.cells_B0))
+        omega_mixed = (self.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+
+        max_memory = 10000000
+        N_cells = len(self.cells_B0)
+        results = []
+        idx_end = 0
+        while idx_end != -1:
+            idx_start = idx_end
+            this_t = None
+            if N_cells* len(t[idx_start:]) > max_memory:
+                idx_end = idx_start + max_memory//N_cells
+                this_t = t[idx_start:idx_end]
+            else:
+                idx_end = -1
+                this_t = t[idx_start:]
+
+            argument = np.outer(omega_mixed,this_t) - phase[:, None]
+            # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
+            # already assumed that dmu_y_dt is 0, so we can leave out that term
+            B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.material.T2)[:, None]).T
+            #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+            results.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
+        results = np.concatenate(results)
+        return results
+
+    def pickup_flux_nummerical(self, t, mix_down=0*MHz):
+        """
+        # would have to solve Bloch Equations
+        #                             ( B_RF sin(omega*t) )
+        # dvec(M)/dt = gamma vec(M) x (         0         )
+        #                             (         B_z       )
+
+        # Add longitudinal relaxation (T1)
+
+        # integrate dM/dt with RK4
+        # dMx/dt = -γₚ(My*Bz-Mz*By) - Mx/T2
+        # dMy/dt = -γₚ(Mz*Bx-Mx*Bz) - My/T2
+        # dMz/dt = -γₚ(Mx*By-My*Bx) - (Mz-M0)/T1
+
+        # limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
+        """
+        omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
+        def Bloch_equation_with_RF_field(t, M):
+            dM_dt = self.material.gyromagnetic_ratio*np.cross(M, [self.cells_B1*np.sin(omega_NMR*t), self.cells_B0, self.cells_B1*np.cos(omega_NMR*t)])
+            return dM_dt
+
+        rk_res = integrate.RK45(Bloch_equation_with_RF_field,
+                                t0=0,
+                                y0=[0.3,0.3,0.3],
+                                t_bound=t_90,
+                                max_step=t_90/100000)
+        history = []
+        while rk_res.status == "running":
+            history.append([rk_res.t, rk_res.y])
+            rk_res.step()
+
+    def pickup_flux_nummerical2(self, t, mix_down=0*MHz):
+        def Bloch_equation_with_RF_field(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
+            # M is a vector of length 3 and is: M = [Mx, My, My].
+            # Return dM_dt, that is a vector of length 3 as well.
+            Mx, My, Mz = M
+            M0 = 1
+            #relaxation = np.array([-Mx/T2, -My/T2, -(Mz-M0)/T1])
+
+            dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
+            return dM_dt
+
+        solution = integrate.odeint(Bloch_equation_with_RF_field,
+                                    y0=[0.3, 0.3, 0.3],
+                                    t=np.linspace(0., t_90, 100000),
+                                    args=(γₚ, B0, nmr_coil.B_field_mag(0*mm,0*mm,0*mm), omega_NMR ))
 
 
 class Noise(object):
@@ -408,75 +488,3 @@ class FixedProbe(Probe):
                          coil = fix_probe_coil,
                          N_cells = N_cells,
                          seed = seed)
-
-
-"""
-# that about motion / diffusion within material
-# what about other components of the probe
-# what about spin-spin interactions
-
-
-# would have to solve Bloch Equations
-#                             ( B_RF sin(omega*t) )
-# dvec(M)/dt = gamma vec(M) x (         0         )
-#                             (         B_z       )
-
-Bz = B0
-Brf = rnm_coil.B_field_mag(0*mm,0*mm,0*mm)
-omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
-
-def Bloch_equation_with_RF_field(t, M):
-    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega_NMR*t), Brf*np.cos(omega_NMR*t), Bz])
-    return dM_dt
-
-rk_res = integrate.RK45(Bloch_equation_with_RF_field,
-                        t0=0,
-                        y0=[0.3,0.3,0.3],
-                        t_bound=t_90,
-                        max_step=t_90/100000)
-history = []
-while rk_res.status == "running":
-    history.append([rk_res.t, rk_res.y])
-    rk_res.step()
-
-####################################################################################
-
-def Bloch_equation_with_RF_field(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
-    # M is a vector of length 3 and is: M = [Mx, My, My].
-    # Return dM_dt, that is a vector of length 3 as well.
-    Mx, My, Mz = M
-    M0 = 1
-    #relaxation = np.array([-Mx/T2, -My/T2, -(Mz-M0)/T1])
-
-    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
-    return dM_dt
-
-solution = integrate.odeint(Bloch_equation_with_RF_field,
-                            y0=[0.3, 0.3, 0.3],
-                            t=np.linspace(0., t_90, 100000),
-                            args=(γₚ, B0, nmr_coil.B_field_mag(0*mm,0*mm,0*mm), omega_NMR ))
-
-
-plt.figure()
-plt.plot([h[1][0] for h in history], label="$M_x$ (RK45)")
-plt.plot(solution[:,0], color="r", ls="--", label="$M_x$ (odeint)")
-plt.plot(solution[:,1], color="b", label="$M_y$ (odeint)")
-plt.plot(solution[:,2], color="g", label="$M_z$ (odeint)")
-plt.xlabel("time / steps")
-plt.ylabel("$M_i$")
-plt.legend()
-plt.show()
-
-########################################################################################
-
-# Add longitudinal relaxation (T1)
-
-# integrate dM/dt with RK4
-# dMx/dt = -γₚ(My*Bz-Mz*By) - Mx/T2
-# dMy/dt = -γₚ(Mz*Bx-Mx*Bz) - My/T2
-# dMz/dt = -γₚ(Mx*By-My*Bx) - (Mz-M0)/T1
-
-# limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
-
-########################################################################################
-"""
