@@ -90,6 +90,49 @@ class SuperconductingMagnet(object):
     def __call__(self, x=0, y=0, z=0):
         return self.B_field(x, y, z)
 
+    def strength_to_str(self, multipole, strength):
+        str = "%.1f ppm"%(strength*1e6)
+        if strength < 1e-6:
+            str = "%.1f ppb"%(strength*1e9)
+
+        if multipole==1: return "Dipole: %s$\cdot (1, 0, 0)^T$"%str
+        if multipole==2: return "Dipole: %s$\cdot (0, 1, 0)^T$"%str
+        if multipole==3: return "Dipole: %s$\cdot (0, 0, 1)^T$"%str
+
+        if multipole==4: return "Quadrupole: %s/cm$\cdot (x, -y, 0)^T$"%str
+        if multipole==5: return "Quadrupole: %s/cm$\cdot (z, 0, x)^T$"%str
+        if multipole==6: return "Quadrupole: %s/cm$\cdot (0, -y, z)^T$"%str
+        if multipole==7: return "Quadrupole: %s/cm$\cdot (y, x, 0)^T$"%str
+        if multipole==8: return "Quadrupole: %s/cm$\cdot (0, z, y)^T$"%str
+
+        if multipole==9: return "Sextupole: %s/cm$^2\cdot (x^2-y^2, -2xy, 0)^T$"%str
+        if multipole==10: return "Sextupole: %s/cm$^2\cdot (2xz, -2yz, x^2-y^2)^T$"%str
+        if multipole==11: return "Sextupole: %s/cm$^2\cdot (z^2-y^2, -2xy, 2xy)^T$"%str
+        if multipole==12: return "Sextupole: %s/cm$^2\cdot (0, -2yz, z^2-y^2)^T$"%str
+        if multipole==13: return "Sextupole: %s/cm$^2\cdot (2xy, x^2-y^2, 0)^T$"%str
+        if multipole==14: return "Sextupole: %s/cm$^2\cdot (yz, xz, xy)^T$"%str
+        if multipole==15: return "Sextupole: %s/cm$^2\cdot (0, z^2-y^2, 2yz)^T$"%str
+
+        if multipole==16: return "Octupole: %s/cm$^3\cdot (x^3-3xy^2, y^3-3x^2y,0)^T$"%str
+        if multipole==17: return "Octupole: %s/cm$^3\cdot (3x^2z-3zy^2, -6xyz, x^3 - 3xy^2)^T$"%str
+        if multipole==18: return "Octupole: %s/cm$^3\cdot (3xz^2-3xy^2, -3x^2y-3z^2y+2y^3, 3x^2z-3zy^2)^T$"%str
+        if multipole==19: return "Octupole: %s/cm$^3\cdot (z^3-3zy^2, -6xyz, 3xz^2 - 3xy^2)^T$"%str
+        if multipole==20: return "Octupole: %s/cm$^3\cdot (0, y^3-3z^2y, z^3-3zy^2)^T$"%str
+        if multipole==21: return "Octupole: %s/cm$^3\cdot (3x^2y-y^3, x^3-3xy^2, 0)^T$"%str
+        if multipole==22: return "Octupole: %s/cm$^3\cdot (6xyz, 3x^2z-3zy^2, 3x^2y-y^3)^T$"%str
+        if multipole==23: return "Octupole: %s/cm$^3\cdot (3z^2y-y^3, 3xz^2-3xy^2, 6xyz)^T$"%str
+        if multipole==24: return "Octupole: %s/cm$^3\cdot (0, z^3-3zy^2, 3z^2y-y^3)^T$"%str
+
+    def set_strength_at_1cm(self, multipole, strength)
+        if  multipole < 1 or multipole > 24:
+            raise ValueError("Multipoles are only defined for index 1 to 24.")
+        elif 4 <= multipole and multipole <= 8:
+            strength /= cm
+        elif 9 <= multipole and multipole <= 15:
+            strength /= cm**2
+        else 16 <= multipole and multipole <= 24:
+            strength /= cm**3
+        self.An[multipole] = strength*self.An[2]
 
 class Material(object):
     def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None, gyromagnetic_ratio=None):
