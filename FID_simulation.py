@@ -367,20 +367,31 @@ class Probe(object):
 
         # limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
         """
-        omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
-        def Bloch_equation_with_RF_field(t, M):
-            dM_dt = self.material.gyromagnetic_ratio*np.cross(M, [self.cells_B1*np.sin(omega_NMR*t), self.cells_B0, self.cells_B1*np.cos(omega_NMR*t)])
-            return dM_dt
+        def Bloch_equation(t, M):
+            M = M.reshape((3, self.N_cells))
+            Mx, My, Mz = M[0], M[1], M[2]
+            Bx, By, Bz = self.cells_B0_x, self.cells_B0_y, self.cells_B0_z
+            dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By) - Mx / self.material.T2
+            dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz) - My / self.material.T2
+            dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx) # - (Mz-1) / self.material.T1
+            #dM_dt = self.material.gyromagnetic_ratio*np.cross([Mx, My, Mz], [self.cells_B0_x, self.cells_B0_y, self.cells_B0_z]) - np.array([Mx/self.material.T2, My/self.material.T2, (Mz-self.cells_magnetization)/self.material.T2])
+            return np.array([dMx, dMy, dMz]).flatten()
 
-        rk_res = integrate.RK45(Bloch_equation_with_RF_field,
+        rk_res = integrate.RK45(Bloch_equation,
                                 t0=0,
-                                y0=[0.3,0.3,0.3],
-                                t_bound=t_90,
-                                max_step=t_90/100000)
+                                y0=np.array([self.cells_mu_x, self.cells_mu_y, self.cells_mu_z]).flatten(),
+                                t_bound=0.5*ms,
+                                max_step=1e-4*ms)
         history = []
         while rk_res.status == "running":
-            history.append([rk_res.t, rk_res.y])
+            #B_x_dmu_dt = (self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.material.T2)[:, None]).T
+            #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+            M = rk_res.y.reshape((3, self.N_cells))
+            Mx, My, Mz = M[0], M[1], M[2]
+            signal = np.sum(self.cells_B1_x*Mx + self.cells_B1_y*My+ self.cells_B1_z*Mz)
+            history.append([rk_res.t/ms, signal/T])
             rk_res.step()
+        return history
 
     def pickup_flux_nummerical2(self, t, mix_down=0*MHz):
         def Bloch_equation_with_RF_field(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
