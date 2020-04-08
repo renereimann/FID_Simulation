@@ -371,9 +371,9 @@ class Probe(object):
             M = M.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]
             Bx, By, Bz = self.cells_B0_x, self.cells_B0_y, self.cells_B0_z
-            dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By) - Mx / self.material.T2
-            dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz) - My / self.material.T2
-            dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx) # - (Mz-1) / self.material.T1
+            dMx = -self.material.gyromagnetic_ratio*(My*Bz-Mz*By) - Mx / self.material.T2
+            dMy = -self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz)# - (My-1) / self.material.T1
+            dMz = -self.material.gyromagnetic_ratio*(Mx*By-My*Bx) - Mz / self.material.T2
             #dM_dt = self.material.gyromagnetic_ratio*np.cross([Mx, My, Mz], [self.cells_B0_x, self.cells_B0_y, self.cells_B0_z]) - np.array([Mx/self.material.T2, My/self.material.T2, (Mz-self.cells_magnetization)/self.material.T2])
             return np.array([dMx, dMy, dMz]).flatten()
 
