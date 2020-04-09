@@ -261,6 +261,8 @@ class Probe(object):
                     and calculated from external B_field
                     Default: None
             * omega_rf: RF pulse frequency
+                    If omega_rf is None, no RF pulse is applied and a Free
+                    Induction Decay is happening
                     Default: 2 pi 61.79 MHz
             * with_relaxation: If true the relaxation terms are considered in the
                     Bloch equations. If false the relaxation terms are neglected.
@@ -294,36 +296,43 @@ class Probe(object):
 
         # pulse frequency
         def Bloch_equation(t, M):
-            M = M.reshape((3, self.N_cells))                                    # 1
-            Mx, My, Mz = M[0], M[1], M[2]                                       # 1
-            rf_osci = np.sin(omega_rf*t)                                        # 1
-            Bx = self.cells_B0_x + rf_osci * self.cells_B1_x                    # T
-            By = self.cells_B0_y + rf_osci * self.cells_B1_y                    # T
-            Bz = self.cells_B0_z + rf_osci * self.cells_B1_z                    # T
-            dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By)                # 1/s
-            dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz)                # 1/s
-            dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx)                # 1/s
+            M = M.reshape((3, self.N_cells))
+            Mx, My, Mz = M[0], M[1], M[2]
+            rf_osci = np.sin(omega_rf*t)
+            Bx = self.cells_B0_x + rf_osci * self.cells_B1_x
+            By = self.cells_B0_y + rf_osci * self.cells_B1_y
+            Bz = self.cells_B0_z + rf_osci * self.cells_B1_z
+            dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By)
+            dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz)
+            dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx)
             if with_relaxation:
                 # note we approximate here that the external field is in y direction
                 # in the ideal case we would calculate the B0_field direct and the ortogonal plane
                 dMx -= Mx/self.material.T2
                 dMy -= (My-1)/self.material.T2
                 dMz -= Mz/self.material.T2
-            return np.array([dMx, dMy, dMz]).flatten()                          # 1/s
+            return np.array([dMx, dMy, dMz]).flatten()
 
         rk_res = integrate.RK45(Bloch_equation,
                                 t0=0,
                                 y0=np.array(initial_condition).flatten(),
                                 t_bound=time,
-                                max_step=1*ns)
+                                max_step=1*ns)  # about 10 points per oscillation
         history = []
 
         idx = np.argmin(self.cells_x**2 + self.cells_y**2 + self.cells_z**2)
+        M = None
         while rk_res.status == "running":
             M = rk_res.y.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]                                       # 1
             history.append([rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]])
             rk_res.step()
+
+        self.cells_mu_x = M[0]
+        self.cells_mu_y = M[1]
+        self.cells_mu_z = M[2]
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+
         return history
 
 
