@@ -298,10 +298,15 @@ class Probe(object):
         def Bloch_equation(t, M):
             M = M.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]
-            rf_osci = np.sin(omega_rf*t)
-            Bx = self.cells_B0_x + rf_osci * self.cells_B1_x
-            By = self.cells_B0_y + rf_osci * self.cells_B1_y
-            Bz = self.cells_B0_z + rf_osci * self.cells_B1_z
+
+            Bx = self.cells_B0_x
+            By = self.cells_B0_y
+            Bz = self.cells_B0_z
+            if omega_rf is not None:
+                rf_osci = np.sin(omega_rf*t)
+                Bx = Bx + rf_osci * self.cells_B1_x
+                By = By + rf_osci * self.cells_B1_y
+                Bz = Bz + rf_osci * self.cells_B1_z
             dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By)
             dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz)
             dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx)
