@@ -12,7 +12,7 @@
 import numpy as np
 from scipy import integrate
 from scipy import fftpack
-from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
+from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, ns, Hz, kHz, MHz
 from numericalunits import T, K, g, mol, A, uV, mV, V
 
 class SuperconductingMagnet(object):
@@ -317,6 +317,113 @@ class Probe(object):
         self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
+    def apply_rf_field_nummerical(self, time=None, initial_condition=None, omega_rf=2*np.pi*61.79*MHz, with_relaxation=False):
+        """Solves the Bloch Equation numerically for a RF pulse with length `time`
+        and frequency `omega_rf`.
+
+        Parameters:
+            * time: Length of RF pulse (e.g. a pi/2 pulse time or pi pulse time)
+                    If time is None, the pi/2 is estimated.
+                    Default: None
+            * initial_condition: Inital mu_x, mu_y, mu_z of cells.
+                    Given as arrays of shap [3,N_cells]
+                    If None the inital condition is assumed to be in equilibrium
+                    and calculated from external B_field
+                    Default: None
+            * omega_rf: RF pulse frequency
+                    If omega_rf is None, no RF pulse is applied and a Free
+                    Induction Decay is happening
+                    Default: 2 pi 61.79 MHz
+            * with_relaxation: If true the relaxation terms are considered in the
+                    Bloch equations. If false the relaxation terms are neglected.
+                    Default: False
+
+        Returns:
+            * history: array of shape (7, N_time_steps)
+                       times, mean_Mx, mean_My, mean_Mz, Mx(0,0,0), My(0,0,0), Mz(0,0,0)
+
+
+        Note: all magnetizations are treated as relative parameters wrt to the
+              equalibrium magnetization, i.e. all values are without units and
+              restricted to -1 and 1.
+        """
+
+        if time is None:
+            # if no time is given we estimate the pi/2 pulse duration and use that
+            time = self.t_90()
+
+        if initial_condition is None:
+            # if no initial condition for the magnetization is given, we use the
+            # equilibrium magnetization, which is aligned with the direction of
+            # the external field.
+            initial_condition = [self.cells_B0_x/self.cells_B0,
+                                 self.cells_B0_y/self.cells_B0,
+                                 self.cells_B0_z/self.cells_B0]
+
+        if not hasattr(self, "cells_B1"):
+            # if cells B1 is not yet calculated, calculate B1 components
+            self.initialize_coil_field()
+
+        #def Bloch_equation(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
+        #    # M is a vector of length 3 and is: M = [Mx, My, My].
+        #    # Return dM_dt, that is a vector of length 3 as well.
+        #    Mx, My, Mz = M
+        #    M0 = 1
+        #    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
+        #    return dM_dt
+        #solution = integrate.odeint(Bloch_equation_with_RF_field,
+        #                            y0=[0.3, 0.3, 0.3],
+        #                            t=np.linspace(0., t_90, 100000),
+        #                            args=(γₚ, B0, nmr_coil.B_field_mag(0*mm,0*mm,0*mm), omega_NMR ))
+
+        # pulse frequency
+        def Bloch_equation(t, M):
+            M = M.reshape((3, self.N_cells))
+            Mx, My, Mz = M[0], M[1], M[2]
+
+            Bx = self.cells_B0_x
+            By = self.cells_B0_y
+            Bz = self.cells_B0_z
+            if omega_rf is not None:
+                rf_osci = np.sin(omega_rf*t)
+                Bx = Bx + rf_osci * self.cells_B1_x
+                By = By + rf_osci * self.cells_B1_y
+                Bz = Bz + rf_osci * self.cells_B1_z
+            dMx = self.material.gyromagnetic_ratio*(My*Bz-Mz*By)
+            dMy = self.material.gyromagnetic_ratio*(Mz*Bx-Mx*Bz)
+            dMz = self.material.gyromagnetic_ratio*(Mx*By-My*Bx)
+            if with_relaxation:
+                # note we approximate here that the external field is in y direction
+                # in the ideal case we would calculate the B0_field direct and the ortogonal plane
+                dMx -= Mx/self.material.T2
+                dMy -= (My-1)/self.material.T2
+                dMz -= Mz/self.material.T2
+            return np.array([dMx, dMy, dMz]).flatten()
+
+        rk_res = integrate.RK45(Bloch_equation,
+                                t0=0,
+                                y0=np.array(initial_condition).flatten(),
+                                t_bound=time,
+                                max_step=1*ns)  # about 10 points per oscillation
+        history = []
+
+        idx = np.argmin(self.cells_x**2 + self.cells_y**2 + self.cells_z**2)
+        M = None
+        while rk_res.status == "running":
+            M = rk_res.y.reshape((3, self.N_cells))
+            Mx, My, Mz = M[0], M[1], M[2]                                       # 1
+            history.append([rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]])
+            rk_res.step()
+
+        self.cells_mu_x = M[0]
+        self.cells_mu_y = M[1]
+        self.cells_mu_z = M[2]
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+
+        return history
+
+
+
     def t_90(self):
         brf = self.coil.B_field(0*mm,0*mm,0*mm)
         # B1 field strength is half of RF field
@@ -324,7 +431,7 @@ class Probe(object):
         t_90 = (np.pi/2)/(self.material.gyromagnetic_ratio*b1)
         return t_90
 
-    def pickup_flux(self, t, mix_down=0*MHz):
+    def pickup_flux(self, t, mix_down=0*MHz, useAverage=True):
         # Φ(t) = Σ N B₂(r) * μ(t) / I
         # a mix down_frequency can be propergated through and will effect the
         # individual cells
@@ -384,10 +491,14 @@ class Probe(object):
             # already assumed that dmu_y_dt is 0, so we can leave out that term
             B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
-            results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None]))
+            if useAverage:
+                results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2 /np.mean(self.cells_B1[:, None]))
+            else:
+                results.append(self.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None]/self.cells_B1[:, None], axis=0) * np.pi * self.coil.radius**2)
+            # Alternative
+            # results.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
         results = np.concatenate(results)/N_cells
         return results
-
 
 class Noise(object):
     r"""Class to generate noise and drift for time series. We plan to support
@@ -478,75 +589,3 @@ class FixedProbe(Probe):
                          coil = fix_probe_coil,
                          N_cells = N_cells,
                          seed = seed)
-
-
-"""
-# that about motion / diffusion within material
-# what about other components of the probe
-# what about spin-spin interactions
-
-
-# would have to solve Bloch Equations
-#                             ( B_RF sin(omega*t) )
-# dvec(M)/dt = gamma vec(M) x (         0         )
-#                             (         B_z       )
-
-Bz = B0
-Brf = rnm_coil.B_field_mag(0*mm,0*mm,0*mm)
-omega_NMR = 61.79*MHz    # circuit of the probe tuned for this value
-
-def Bloch_equation_with_RF_field(t, M):
-    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega_NMR*t), Brf*np.cos(omega_NMR*t), Bz])
-    return dM_dt
-
-rk_res = integrate.RK45(Bloch_equation_with_RF_field,
-                        t0=0,
-                        y0=[0.3,0.3,0.3],
-                        t_bound=t_90,
-                        max_step=t_90/100000)
-history = []
-while rk_res.status == "running":
-    history.append([rk_res.t, rk_res.y])
-    rk_res.step()
-
-####################################################################################
-
-def Bloch_equation_with_RF_field(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
-    # M is a vector of length 3 and is: M = [Mx, My, My].
-    # Return dM_dt, that is a vector of length 3 as well.
-    Mx, My, Mz = M
-    M0 = 1
-    #relaxation = np.array([-Mx/T2, -My/T2, -(Mz-M0)/T1])
-
-    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
-    return dM_dt
-
-solution = integrate.odeint(Bloch_equation_with_RF_field,
-                            y0=[0.3, 0.3, 0.3],
-                            t=np.linspace(0., t_90, 100000),
-                            args=(γₚ, B0, nmr_coil.B_field_mag(0*mm,0*mm,0*mm), omega_NMR ))
-
-
-plt.figure()
-plt.plot([h[1][0] for h in history], label="$M_x$ (RK45)")
-plt.plot(solution[:,0], color="r", ls="--", label="$M_x$ (odeint)")
-plt.plot(solution[:,1], color="b", label="$M_y$ (odeint)")
-plt.plot(solution[:,2], color="g", label="$M_z$ (odeint)")
-plt.xlabel("time / steps")
-plt.ylabel("$M_i$")
-plt.legend()
-plt.show()
-
-########################################################################################
-
-# Add longitudinal relaxation (T1)
-
-# integrate dM/dt with RK4
-# dMx/dt = -γₚ(My*Bz-Mz*By) - Mx/T2
-# dMy/dt = -γₚ(Mz*Bx-Mx*Bz) - My/T2
-# dMz/dt = -γₚ(Mx*By-My*Bx) - (Mz-M0)/T1
-
-# limit T2 --> infty: Mx/y(t) = exp(-t/T1) sin(omega t-phi0)
-
-########################################################################################
-"""
