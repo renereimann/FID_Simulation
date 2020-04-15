@@ -36,12 +36,11 @@ ToDo:
     * dependence on length of fit window (error estimation)
     * errors at datapoints
   * implement other methods
+* H <-> M <-> B in Bloch Equation --> uses M, but only contains effects below few atomic distancies
+* Frequency bandwidth implementation (10 µs --> 100 kHz), see Keeler soft and hard pulses
+* Calculate effect of Magnetization B field
+* implement Pulnging Probe
 
-
-Reduce Approximations:
-* Numerical solution Bloch Equations
-* T_1
-
-# that about motion / diffusion within material
-# what about other components of the probe
-# what about spin-spin interactions
+* that about motion / diffusion within material
+* what about other components of the probe
+* what about spin-spin interactions
