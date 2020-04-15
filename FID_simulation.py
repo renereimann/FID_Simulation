@@ -418,8 +418,9 @@ class Probe(object):
             if with_relaxation:
                 # note we approximate here that the external field is in y direction
                 # in the ideal case we would calculate the B0_field direct and the ortogonal plane
+                # note that we use relative magnetization , so the -1 is -M0
                 dMx -= Mx/self.material.T2
-                dMy -= (My-1)/self.material.T2
+                dMy -= (My-1)/self.material.T1
                 dMz -= Mz/self.material.T2
             return np.array([dMx, dMy, dMz]).flatten()
 
