@@ -15,6 +15,13 @@ from scipy import fftpack
 from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, ns, Hz, kHz, MHz
 from numericalunits import T, K, g, kg, mol, A, uV, mV, V
 
+ppm = 1e-6
+ppb = 1e-9
+ppt = 1e-12
+ppq = 1e-15
+T0 = -273.15*K
+
+
 class SuperconductingMagnet(object):
     def __init__(self, B0):
         self.An = self.P = { # dipoles
@@ -91,9 +98,9 @@ class SuperconductingMagnet(object):
         return self.B_field(x, y, z)
 
     def strength_to_str(self, multipole, strength):
-        str = "%.1f ppm"%(strength*1e6)
-        if strength < 1e-6:
-            str = "%.1f ppb"%(strength*1e9)
+        str = "%.1f ppm"%(strength/ppm)
+        if strength < 1*ppm:
+            str = "%.1f ppb"%(strength/ppb)
 
         vec = self.multipole_vector_str(multipole)
 
@@ -317,7 +324,13 @@ class Probe(object):
         self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
-    def apply_rf_field_nummerical(self, time=None, initial_condition=None, omega_rf=2*np.pi*61.79*MHz, with_relaxation=False):
+    def apply_rf_field_nummerical(self,
+                                  time=None,
+                                  initial_condition=None,
+                                  omega_rf=2*np.pi*61.79*MHz,
+                                  with_relaxation=False,
+                                  time_step=1.*ns,
+                                  with_self_contribution=True):
         """Solves the Bloch Equation numerically for a RF pulse with length `time`
         and frequency `omega_rf`.
 
@@ -337,7 +350,13 @@ class Probe(object):
             * with_relaxation: If true the relaxation terms are considered in the
                     Bloch equations. If false the relaxation terms are neglected.
                     Default: False
-
+            * time_step: Float, maximal time step used in nummerical solution of
+                    the Differential equation. Note that this value should be
+                    sufficient smaller than the oscillation time scale.
+                    Default: 1 ns
+            * with_self_contribution: Boolean, if True we consider the additional
+                    B-field from the magnetization of the cell.
+                    Default: True
         Returns:
             * history: array of shape (7, N_time_steps)
                        times, mean_Mx, mean_My, mean_Mz, Mx(0,0,0), My(0,0,0), Mz(0,0,0)
@@ -372,6 +391,10 @@ class Probe(object):
             Bx = self.cells_B0_x
             By = self.cells_B0_y
             Bz = self.cells_B0_z
+            if with_self_contribution:
+                Bx = Bx + mu0*self.cells_magnetization*Mx
+                By = By + mu0*self.cells_magnetization*My
+                Bz = Bz + mu0*self.cells_magnetization*Mz
             if omega_rf is not None:
                 rf_osci = np.sin(omega_rf*t)
                 Bx = Bx + rf_osci * self.cells_B1_x
@@ -396,7 +419,7 @@ class Probe(object):
                                 t0=0,
                                 y0=np.array(initial_condition).flatten(),
                                 t_bound=time,
-                                max_step=1*ns)  # about 10 points per oscillation
+                                max_step=0.1*ns)  # about 10 points per oscillation
         history = []
 
         idx = np.argmin(self.cells_x**2 + self.cells_y**2 + self.cells_z**2)
@@ -583,15 +606,15 @@ class FixedProbe(Probe):
 class PlungingProbe(Probe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
 
-        delta_s_f = -6.9e-9
-        delta_p = 1.4e-9
+        delta_s_f = -6.9*ppb
+        delta_p = 1.4*ppb
         delta_RF = 0
         delta_d = 0
         delta_t_f = delta_s_f + delta_p + delta_RF + delta_d
 
-        T0 = 273.15
-        sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T/K-(25+T0))
-        mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T/K-(20+T0)) - 1.27e-7 *(T/K-(20+T0))**2 + 8.09e-10 *(T/K-(20+T0))**3 )
+
+        sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T-(25*K+T0))/K
+        mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T-(20*K+T0))/K - 1.27e-7 *(T/K-(20+T0/K))**2 + 8.09e-10 *(T/K-(20+T0/K))**3 )
         epsilon_shape = 0.49991537
         delta_b_H2O = lambda T: (epsilon_shape - (1/3)) * mag_susceptibility_H2O(T)
 
