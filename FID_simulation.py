@@ -264,6 +264,18 @@ class Coil(object):
 
         return [B_x, B_y, B_z]
 
+    def Bz(self, z):
+        """ This is an analytical solution for the B_z component along the x=y=0
+        axis. We used the formula from "Experimentalphysik 2" Demtröder Section
+        3.2.6 d) (Page 95/96, 5th edition)
+        """
+        n = self.turns / self.length
+        I = self.current
+        L = self.length
+        R = self.coil.radius
+        B_z = lambda z: µ0*n*I/2*((z+L/2)/np.sqrt(R**2+(z+L/2)**2)-(z-L/2)/np.sqrt(R**2+(z-L/2)**2))
+        return B_z(z)
+
 
 class Probe(object):
     def __init__(self, length, diameter, material, temp, B_field, coil, N_cells, seed):
