@@ -595,8 +595,8 @@ class PlungingProbe(Probe):
         epsilon_shape = 0.49991537
         delta_b_H2O = lambda T: (epsilon_shape - (1/3)) * mag_susceptibility_H2O(T)
 
-        omega_p_free = 22.6752218744e8*Hz/T
-        omega_p_meas = omega_p_free*(1 - sigma_H2O(T) - delta_b_H2O(T) - delta_t_f )
+        omega_p_free = 2.6752218744e8*Hz/T
+        omega_p_meas = lambda T: omega_p_free*(1 - sigma_H2O(T) - delta_b_H2O(T) - delta_t_f )
 
         water = Material(name = "Ultra-Pure ASTM Type 1 Water",
                                    formula = "H2O",
@@ -604,7 +604,7 @@ class PlungingProbe(Probe):
                                    molar_mass = 18.01528*g/mol,
                                    T1 = 1*s,
                                    T2 = 100*ms,
-                                   gyromagnetic_ratio=omega_p_meas,
+                                   gyromagnetic_ratio=omega_p_meas(300*K),
                                    )
 
         plunging_probe_coil = Coil(turns=5.5,
