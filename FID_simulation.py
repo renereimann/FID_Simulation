@@ -13,7 +13,7 @@ import numpy as np
 from scipy import integrate
 from scipy import fftpack
 from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, ns, Hz, kHz, MHz
-from numericalunits import T, K, g, mol, A, uV, mV, V
+from numericalunits import T, K, g, kg, mol, A, uV, mV, V
 
 class SuperconductingMagnet(object):
     def __init__(self, B0):
@@ -364,18 +364,6 @@ class Probe(object):
             # if cells B1 is not yet calculated, calculate B1 components
             self.initialize_coil_field()
 
-        #def Bloch_equation(M, t, γₚ, Bz, Brf, omega, T1=np.inf, T2=np.inf):
-        #    # M is a vector of length 3 and is: M = [Mx, My, My].
-        #    # Return dM_dt, that is a vector of length 3 as well.
-        #    Mx, My, Mz = M
-        #    M0 = 1
-        #    dM_dt = γₚ*np.cross(M, [Brf*np.sin(omega*t), Brf*np.cos(omega*t), Bz]) #+ relaxation
-        #    return dM_dt
-        #solution = integrate.odeint(Bloch_equation_with_RF_field,
-        #                            y0=[0.3, 0.3, 0.3],
-        #                            t=np.linspace(0., t_90, 100000),
-        #                            args=(γₚ, B0, nmr_coil.B_field_mag(0*mm,0*mm,0*mm), omega_NMR ))
-
         # pulse frequency
         def Bloch_equation(t, M):
             M = M.reshape((3, self.N_cells))
@@ -400,6 +388,10 @@ class Probe(object):
                 dMz -= Mz/self.material.T2
             return np.array([dMx, dMy, dMz]).flatten()
 
+        #solution = integrate.odeint(Bloch_equation,
+        #                            y0=np.array(initial_condition).flatten(),
+        #                            t=np.linspace(0., time, int(time/ns)))
+
         rk_res = integrate.RK45(Bloch_equation,
                                 t0=0,
                                 y0=np.array(initial_condition).flatten(),
@@ -421,8 +413,6 @@ class Probe(object):
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
         return history
-
-
 
     def t_90(self):
         brf = self.coil.B_field(0*mm,0*mm,0*mm)
@@ -587,5 +577,49 @@ class FixedProbe(Probe):
                          temp = (273.15 + 26.85) * K,
                          B_field = B_field,
                          coil = fix_probe_coil,
+                         N_cells = N_cells,
+                         seed = seed)
+
+class PlungingProbe(Probe):
+    def __init__(self, B_field, N_cells=1000, seed=12345):
+
+        delta_s_f = -6.9e-9
+        delta_p = 1.4e-9
+        delta_RF = 0
+        delta_d = 0
+        delta_t_f = delta_s_f + delta_p + delta_RF + delta_d
+
+        T0 = 273.15
+        sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T/K-(25+T0))
+        mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T/K-(20+T0)) - 1.27e-7 *(T/K-(20+T0))**2 + 8.09e-10 *(T/K-(20+T0))**3 )
+        epsilon_shape = 0.49991537
+        delta_b_H2O = lambda T: (epsilon_shape - (1/3)) * mag_susceptibility_H2O(T)
+
+        omega_p_free = 22.6752218744e8*Hz/T
+        omega_p_meas = omega_p_free*(1 - sigma_H2O(T) - delta_b_H2O(T) - delta_t_f )
+
+        water = Material(name = "Ultra-Pure ASTM Type 1 Water",
+                                   formula = "H2O",
+                                   density = 997*kg/m**3,
+                                   molar_mass = 18.01528*g/mol,
+                                   T1 = 1*s,
+                                   T2 = 100*ms,
+                                   gyromagnetic_ratio=omega_p_meas,
+                                   )
+
+        plunging_probe_coil = Coil(turns=5.5,
+                              length=10.0*mm,
+                              diameter=15.065*mm+(0.97*mm/2),
+                              current=0.7*A) # ???
+        # L = 0.5 uH
+        # C_p = 1-12 pF
+        # C_s = 1-12 pF in series with L*C_p
+
+        super().__init__(length = 228.6*mm,
+                         diameter = 4.2065*mm,
+                         material = water,
+                         temp = (273.15 + 26.85) * K,
+                         B_field = B_field,
+                         coil = plunging_probe_coil,
                          N_cells = N_cells,
                          seed = seed)
