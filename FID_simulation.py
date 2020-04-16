@@ -440,6 +440,10 @@ class Probe(object):
         while rk_res.status == "running":
             M = rk_res.y.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]                                       # 1
+            #wx = self.cells_B1_x/np.sum(self.cells_B1_x)
+            #wy = self.cells_B1_y/np.sum(self.cells_B1_y)
+            #wz = self.cells_B1_z/np.sum(self.cells_B1_z)
+            #history.append([rk_res.t, np.sum(Mx*wx), np.sum(My*wy), np.sum(Mz*wz), Mx[idx], My[idx], Mz[idx]])
             history.append([rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]])
             rk_res.step()
 
@@ -597,8 +601,8 @@ class FixedProbe(Probe):
                                    formula = "C40H46N4O10",
                                    density = 0.848*g/cm**3,
                                    molar_mass = 742.8*g/mol,
-                                   T1 = 3*s,
-                                   T2 = 3*s,
+                                   T1 = 1*s,
+                                   T2 = 40*ms,
                                    gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
                                    )
 
@@ -625,7 +629,6 @@ class PlungingProbe(Probe):
         delta_d = 0
         delta_t_f = delta_s_f + delta_p + delta_RF + delta_d
 
-
         sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T-(25*K+T0))/K
         mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T-(20*K+T0))/K - 1.27e-7 *(T/K-(20+T0/K))**2 + 8.09e-10 *(T/K-(20+T0/K))**3 )
         epsilon_shape = 0.49991537
@@ -638,8 +641,8 @@ class PlungingProbe(Probe):
                                    formula = "H2O",
                                    density = 997*kg/m**3,
                                    molar_mass = 18.01528*g/mol,
-                                   T1 = 1*s,
-                                   T2 = 100*ms,
+                                   T1 = 3*s,
+                                   T2 = 3*s,
                                    gyromagnetic_ratio=omega_p_meas(300*K),
                                    )
 
