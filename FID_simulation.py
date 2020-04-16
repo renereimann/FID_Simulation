@@ -597,8 +597,8 @@ class FixedProbe(Probe):
                                    formula = "C40H46N4O10",
                                    density = 0.848*g/cm**3,
                                    molar_mass = 742.8*g/mol,
-                                   T1 = 1*s,
-                                   T2 = 40*ms,
+                                   T1 = 3*s,
+                                   T2 = 3*s,
                                    gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
                                    )
 
