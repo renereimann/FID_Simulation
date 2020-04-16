@@ -404,9 +404,9 @@ class Probe(object):
             By = self.cells_B0_y
             Bz = self.cells_B0_z
             if with_self_contribution:
-                Bx = Bx + mu0*self.cells_magnetization*Mx
-                By = By + mu0*self.cells_magnetization*My
-                Bz = Bz + mu0*self.cells_magnetization*Mz
+                Bx = Bx + µ0*self.cells_magnetization*Mx
+                By = By + µ0*self.cells_magnetization*My
+                Bz = Bz + µ0*self.cells_magnetization*Mz
             if omega_rf is not None:
                 rf_osci = np.sin(omega_rf*t)
                 Bx = Bx + rf_osci * self.cells_B1_x
