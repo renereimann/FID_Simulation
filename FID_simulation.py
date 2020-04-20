@@ -23,8 +23,28 @@ T0 = -273.15*K
 
 
 class SuperconductingMagnet(object):
+    """Class representing the magnetic field of a RingMagnet.
+
+    The main magnetic field B0 is directing in y-direction.
+    Deviations are described by multipoles.
+    The strength of different multipoles can be set by
+        magnet.An[multipole id] =  strength
+    The magnetic field 3D vector can be calculated at any point (x,y,z) by
+    calling the class instance.
+    Further helper functions for pretty prints and unit handling are provided.
+    """
     def __init__(self, B0):
-        self.An = self.P = { # dipoles
+        """
+        Parameters:
+        * B0: float, strength of main direction of the magnetic field.
+
+        Note:
+            * Main magnetic field is a dipole field in y-direction
+            * You can set further multipole strength by
+                  magnet.An[multipole id] = strength
+            * Provide the correct unit for gradient strength, e.g. T/cm, ...
+        """
+        self.An = { # dipoles
                    1: 0*T,
                    2: B0,
                    3: 0*T,
@@ -85,6 +105,16 @@ class SuperconductingMagnet(object):
                  }
 
     def B_field(self, x=0, y=0, z=0):
+        """Evaluates magnetic field at position x, y, z
+
+        Parameters:
+        * x: float, x position
+        * y: float, y position
+        * z: float, z position
+
+        Returns:
+        * array of length 3,  Magnetic field at position (x,y,z)
+        """
         Bx = 0
         By = 0
         Bz = 0
@@ -95,9 +125,28 @@ class SuperconductingMagnet(object):
         return [Bx, By, Bz]
 
     def __call__(self, x=0, y=0, z=0):
+        """Evaluates magnetic field at position x, y, z
+
+        Parameters:
+        * x: float, x position
+        * y: float, y position
+        * z: float, z position
+
+        Returns:
+        * array of length 3,  Magnetic field at position (x,y,z)
+        """
         return self.B_field(x, y, z)
 
     def strength_to_str(self, multipole, strength):
+        """Pretty string for multipole strength.
+
+        Parameters:
+        * multipole: int, Number of the multipole, allowed range 1 - 24.
+        * strength: float, relative strength of the multipole at 1 cm distance
+
+        Returns:
+        * string giving type, of multipole, strength of gradient and shape of multipole
+        """
         str = "%.1f ppm"%(strength/ppm)
         if strength < 1*ppm:
             str = "%.1f ppb"%(strength/ppb)
@@ -116,8 +165,15 @@ class SuperconductingMagnet(object):
         if 16<=multipole and multipole <= 24:
             return "Octupole: %s/cm$^3\cdot %s^T$"%(str, vec)
 
-
     def multipole_vector_str(self, multipole):
+        """String representation of a multipole
+
+        Parameters:
+        * multipole: int, number of multipole, allowed range 1 - 24
+
+        Returns:
+        * string, shape of multipole
+        """
         if multipole==1: return "(1, 0, 0)"
         if multipole==2: return "(0, 1, 0)"
         if multipole==3: return "(0, 0, 1)"
@@ -147,6 +203,14 @@ class SuperconductingMagnet(object):
         if multipole==24: return "(0, z^3-3zy^2, 3z^2y-y^3)"
 
     def multipole_name(self, multipole):
+        """Returns type of multipole as string
+
+        Parameters:
+        * multipole: int, number of multipole, allowed range 1 - 24
+
+        Returns:
+        * string, type of multipole
+        """
         if 1 <= multipole and multipole <= 3:
             return "Dipole"
         if 4 <= multipole and multipole <= 8:
@@ -158,6 +222,14 @@ class SuperconductingMagnet(object):
         raise ValueError("Multipoles are only defined for index 1 to 24.")
 
     def set_strength_at_1cm(self, multipole, strength):
+        """Calculates DeltaB from multipole at 1 cm distance. Takes different
+        units from different multipoles into account
+
+        Parameters:
+        * multipole: int, number of multipole, allowed range 1 - 24
+        * strength: float, strength of gradient
+        """
+
         if  multipole < 1 or multipole > 24:
             raise ValueError("Multipoles are only defined for index 1 to 24.")
         elif 4 <= multipole and multipole <= 8:
@@ -169,7 +241,19 @@ class SuperconductingMagnet(object):
         self.An[multipole] = strength*self.An[2]
 
 class Material(object):
+    """ An Material instance holds material related properties """
     def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None, gyromagnetic_ratio=None):
+        """Generate Material instance
+
+        Parameters:
+        * name: str, Name of the Material
+        * formula: str, chemical formula of the Material
+        * density: float, density of the material, e.g. in units of g/cm^3
+        * molar_mass: float, molare Masse of the Material, e.g. in units of g/mol
+        * T1: float, longitudinal relaxation time of the Material, e.g. in s
+        * T2: float, transversal relaxation time of the Material, e.g. in s
+        * gyromagnetic_ratio: float, gyromagnetic ration of protons shifted by material effects
+        """
         # gyromagnetic ratio, value for free proton: 2.6752218744e8*Hz/T
         # magnetic moment,  value for free proton: 1.41060679736e-26*J/T
         self.name = name
@@ -182,6 +266,7 @@ class Material(object):
         self.magnetic_moment = self.gyromagnetic_ratio*hbar/2
 
     def __str__(self):
+        """String representation of the Material for pretty printing."""
         info = []
         if self.formula is not None:
             info.append(self.formula)
@@ -203,7 +288,6 @@ class Material(object):
         # the package numericalunits already converts "mol" using the Avrogardo
         # constant thus we do not need the extra factor if using numericalunits
         return self.density / self.molar_mass
-
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -275,7 +359,6 @@ class Coil(object):
         R = self.coil.radius
         B_z = lambda z: µ0*n*I/2*((z+L/2)/np.sqrt(R**2+(z+L/2)**2)-(z-L/2)/np.sqrt(R**2+(z-L/2)**2))
         return B_z(z)
-
 
 class Probe(object):
     def __init__(self, length, diameter, material, temp, B_field, coil, N_cells, seed):
@@ -440,10 +523,10 @@ class Probe(object):
         while rk_res.status == "running":
             M = rk_res.y.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]                                       # 1
-            #wx = self.cells_B1_x/np.sum(self.cells_B1_x)
-            #wy = self.cells_B1_y/np.sum(self.cells_B1_y)
-            #wz = self.cells_B1_z/np.sum(self.cells_B1_z)
-            #history.append([rk_res.t, np.sum(Mx*wx), np.sum(My*wy), np.sum(Mz*wz), Mx[idx], My[idx], Mz[idx]])
+            #wx = self.cells_B1_x/np.sum(np.sort(self.cells_B1_x))
+            #wy = self.cells_B1_y/np.sum(np.sort(self.cells_B1_y))
+            #wz = self.cells_B1_z/np.sum(np.sort(self.cells_B1_z))
+            #history.append([rk_res.t, np.sum(np.sort(Mx*wx)), np.sum(np.sort(My*wy)), np.sum(np.sort(Mz*wz)), Mx[idx], My[idx], Mz[idx]])
             history.append([rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]])
             rk_res.step()
 
@@ -589,11 +672,9 @@ class Noise(object):
             noise += self.get_exp_drift(times)
         return noise
 
-
 class StorageRingMagnet(SuperconductingMagnet):
     def __init__(self, B0=1.45*T):
         super().__init__(B0)
-
 
 class FixedProbe(Probe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
