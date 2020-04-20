@@ -22,7 +22,7 @@ ppq = 1e-15
 T0 = -273.15*K
 
 
-class SuperconductingMagnet(object):
+class RingMagnet(object):
     """Class representing the magnetic field of a RingMagnet.
 
     The main magnetic field B0 is directing in y-direction.
@@ -240,6 +240,12 @@ class SuperconductingMagnet(object):
             strength /= cm**3
         self.An[multipole] = strength*self.An[2]
 
+
+class StorageRingMagnet(RingMagnet):
+    def __init__(self, B0=1.45*T):
+        super().__init__(B0)
+
+
 class Material(object):
     """ An Material instance holds material related properties """
     def __init__(self, name, formula=None, density=None, molar_mass=None, T1=None, T2=None, gyromagnetic_ratio=None):
@@ -288,6 +294,30 @@ class Material(object):
         # the package numericalunits already converts "mol" using the Avrogardo
         # constant thus we do not need the extra factor if using numericalunits
         return self.density / self.molar_mass
+
+
+PetroleumJelly = Material(name = "Petroleum Jelly",
+                           formula = "C40H46N4O10",
+                           density = 0.848*g/cm**3,
+                           molar_mass = 742.8*g/mol,
+                           T1 = 1*s,
+                           T2 = 40*ms,
+                           gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
+                           )
+
+sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T-(25*K+T0))/K
+mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T-(20*K+T0))/K - 1.27e-7 *(T/K-(20+T0/K))**2 + 8.09e-10 *(T/K-(20+T0/K))**3 )
+delta_b_H2O = lambda T: (0.49991537 - (1/3)) * mag_susceptibility_H2O(T)
+omega_p_meas = lambda T: 2.6752218744e8*Hz/T*(1 - sigma_H2O(T) - delta_b_H2O(T) + 5.5*ppb )
+PP_Water = Material(name = "Ultra-Pure ASTM Type 1 Water",
+                           formula = "H2O",
+                           density = 997*kg/m**3,
+                           molar_mass = 18.01528*g/mol,
+                           T1 = 3*s,
+                           T2 = 3*s,
+                           gyromagnetic_ratio=omega_p_meas(300*K),
+                           )
+
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -359,6 +389,7 @@ class Coil(object):
         R = self.coil.radius
         B_z = lambda z: µ0*n*I/2*((z+L/2)/np.sqrt(R**2+(z+L/2)**2)-(z-L/2)/np.sqrt(R**2+(z-L/2)**2))
         return B_z(z)
+
 
 class Probe(object):
     def __init__(self, length, diameter, material, temp, B_field, coil, N_cells, seed):
@@ -613,6 +644,7 @@ class Probe(object):
         results = np.concatenate(results)/N_cells
         return results
 
+
 class Noise(object):
     r"""Class to generate noise and drift for time series. We plan to support
     different kind of noise and drift.
@@ -672,72 +704,40 @@ class Noise(object):
             noise += self.get_exp_drift(times)
         return noise
 
-class StorageRingMagnet(SuperconductingMagnet):
-    def __init__(self, B0=1.45*T):
-        super().__init__(B0)
 
 class FixedProbe(Probe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
-        petroleum_jelly = Material(name = "Petroleum Jelly",
-                                   formula = "C40H46N4O10",
-                                   density = 0.848*g/cm**3,
-                                   molar_mass = 742.8*g/mol,
-                                   T1 = 1*s,
-                                   T2 = 40*ms,
-                                   gyromagnetic_ratio=(2*np.pi)*61.79*MHz/(1.45*T),
-                                   )
-
+        current = 0.7*A # ???
         fix_probe_coil = Coil(turns=30,
                               length=15.0*mm,
                               diameter=4.6*mm,
-                              current=0.7*A)
-
+                              current=current)
         super().__init__(length = 30.0*mm,
                          diameter = 1.5*mm,
-                         material = petroleum_jelly,
+                         material = PetroleumJelly,
                          temp = (273.15 + 26.85) * K,
                          B_field = B_field,
                          coil = fix_probe_coil,
                          N_cells = N_cells,
                          seed = seed)
 
+
 class PlungingProbe(Probe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
 
-        delta_s_f = -6.9*ppb
-        delta_p = 1.4*ppb
-        delta_RF = 0
-        delta_d = 0
-        delta_t_f = delta_s_f + delta_p + delta_RF + delta_d
-
-        sigma_H2O = lambda T: 25691e-9 - 10.36e-9*(T-(25*K+T0))/K
-        mag_susceptibility_H2O = lambda T: -9049e-9*(1 + 1.39e-4*(T-(20*K+T0))/K - 1.27e-7 *(T/K-(20+T0/K))**2 + 8.09e-10 *(T/K-(20+T0/K))**3 )
-        epsilon_shape = 0.49991537
-        delta_b_H2O = lambda T: (epsilon_shape - (1/3)) * mag_susceptibility_H2O(T)
-
-        omega_p_free = 2.6752218744e8*Hz/T
-        omega_p_meas = lambda T: omega_p_free*(1 - sigma_H2O(T) - delta_b_H2O(T) - delta_t_f )
-
-        water = Material(name = "Ultra-Pure ASTM Type 1 Water",
-                                   formula = "H2O",
-                                   density = 997*kg/m**3,
-                                   molar_mass = 18.01528*g/mol,
-                                   T1 = 3*s,
-                                   T2 = 3*s,
-                                   gyromagnetic_ratio=omega_p_meas(300*K),
-                                   )
+        # L = 0.5 uH
+        # C_p = 1-12 pF
+        # C_s = 1-12 pF in series with L*C_p
+        current = 0.7*A # ???
 
         plunging_probe_coil = Coil(turns=5.5,
                               length=10.0*mm,
                               diameter=15.065*mm+(0.97*mm/2),
-                              current=0.7*A) # ???
-        # L = 0.5 uH
-        # C_p = 1-12 pF
-        # C_s = 1-12 pF in series with L*C_p
+                              current=current=)
 
         super().__init__(length = 228.6*mm,
                          diameter = 4.2065*mm,
-                         material = water,
+                         material = PP_Water,
                          temp = (273.15 + 26.85) * K,
                          B_field = B_field,
                          coil = plunging_probe_coil,
