@@ -133,7 +133,7 @@ class Probe(object):
 
     def apply_rf_field(self, time=None):
         if time is None:
-            time = self.t_90()
+            time = self.t_90_estimate()
 
         if not hasattr(self, "cells_B1"):
             self.initialize_coil_field()
@@ -144,7 +144,7 @@ class Probe(object):
         self.cells_mu_z = np.sin(self.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
-    def apply_rf_field_nummerical(self,
+    def solve_bloch_eq_nummerical(self,
                                   time=None,
                                   initial_condition=None,
                                   omega_rf=2*np.pi*61.79*MHz,
@@ -189,7 +189,7 @@ class Probe(object):
 
         if time is None:
             # if no time is given we estimate the pi/2 pulse duration and use that
-            time = self.t_90()
+            time = self.t_90_estimate()
 
         if initial_condition is None:
             # if no initial condition for the magnetization is given, we use the
@@ -262,7 +262,7 @@ class Probe(object):
 
         return history
 
-    def t_90(self):
+    def t_90_estimate(self):
         brf = self.coil.B_field(0*mm,0*mm,0*mm)
         # B1 field strength is half of RF field
         b1 = np.sqrt(brf[0]**2+brf[1]**2+brf[2]**2)/2.
