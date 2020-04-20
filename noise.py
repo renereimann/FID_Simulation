@@ -1,5 +1,8 @@
 import numpy as np
-import scipy.fft as fftpack
+try:
+    import scipy.fft as fftpack
+except:
+    import scipy.fftpack as fftpack
 
 
 class Noise(object):
