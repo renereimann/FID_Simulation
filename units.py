@@ -1,5 +1,9 @@
-from numericalunits import µ0, kB, hbar, mm, cm, m, s, ms, us, ns, Hz, kHz, MHz
-from numericalunits import T, K, g, kg, mol, A, uV, mV, V
+from numericalunits import µ0, NA, kB, hbar
+from numericalunits import mm, cm, m
+from numericalunits import ns, us, ms, s, Hz, kHz, MHz
+from numericalunits import uT, mT, T
+from numericalunits import A, ohm, eV, uV, mV, V, W
+from numericalunits import g, kg, N, K, J, mol
 
 ppm = 1e-6
 ppb = 1e-9
