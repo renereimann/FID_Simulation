@@ -1,9 +1,9 @@
 from .units import *
-from .FID_simulation import Coil, Probe
+from .probe import Coil, NMRProbe
 from .material import PetroleumJelly, PP_Water
 from .magnet import RingMagnet
 
-class FixedProbe(Probe):
+class FixedProbe(NMRProbe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
         current = 0.7*A # ???
         fix_probe_coil = Coil(turns=30,
@@ -20,7 +20,7 @@ class FixedProbe(Probe):
                          seed = seed)
 
 
-class PlungingProbe(Probe):
+class PlungingProbe(NMRProbe):
     def __init__(self, B_field, N_cells=1000, seed=12345):
 
         # L = 0.5 uH

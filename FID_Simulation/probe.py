@@ -85,7 +85,7 @@ class Coil(object):
         return B_z(z)
 
 
-class Probe(object):
+class NMRProbe(object):
     def __init__(self, length, diameter, material, temp, B_field, coil, N_cells, seed):
         self.length = length
         self.radius = diameter / 2.
