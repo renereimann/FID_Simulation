@@ -1,4 +1,4 @@
-from units import *
+from .units import *
 
 class RingMagnet(object):
     """Class representing the magnetic field of a RingMagnet.

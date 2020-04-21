@@ -1,10 +1,12 @@
-from FID_simulation import StorageRingMagnet, FixedProbe, Noise
+from E989 import StorageRingMagnet, FixedProbe
+from noise import FreqNoise
+from units import *
+
 import time
 import numpy as np
 from scipy import integrate
 from scipy import fftpack
-from numericalunits import µ0, NA, kB, hbar, mm, cm, m, s, ms, us, Hz, kHz, MHz
-from numericalunits import T, K, J, g, mol, A, ohm, W, N, kg, mV, V, eV, uV
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
@@ -20,7 +22,7 @@ guete = 1.1
 pulse_power = 10*W
 nmr_probe.coil.current = guete * np.sqrt(2*pulse_power/impedance)
 
-noise = Noise(freq_power=-1, scale_freq=3*uV)
+noise = FreqNoise(power=-1, scale=3*uV)
 ################################################################################
 # calculation
 

@@ -11,7 +11,7 @@
 
 import numpy as np
 from scipy import integrate
-from units import *
+from .units import *
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.

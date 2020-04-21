@@ -1,7 +1,7 @@
-from units import *
-from FID_simulation import Coil, Probe
-from material import PetroleumJelly, PP_Water
-from magnet import RingMagnet
+from .units import *
+from .FID_simulation import Coil, Probe
+from .material import PetroleumJelly, PP_Water
+from .magnet import RingMagnet
 
 class FixedProbe(Probe):
     def __init__(self, B_field, N_cells=1000, seed=12345):

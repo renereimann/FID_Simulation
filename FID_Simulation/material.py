@@ -1,5 +1,5 @@
 import numpy as np
-from units import *
+from .units import *
 
 class Material(object):
     """ An Material instance holds material related properties """
