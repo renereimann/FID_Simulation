@@ -1,4 +1,4 @@
-from .units import *
+from ..units import *
 from .probe import Coil, NMRProbe
 from .material import PetroleumJelly, PP_Water
 from .magnet import RingMagnet

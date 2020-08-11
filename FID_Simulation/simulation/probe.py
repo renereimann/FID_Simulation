@@ -11,7 +11,7 @@
 
 import numpy as np
 from scipy import integrate
-from .units import *
+from ..units import *
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -269,6 +269,16 @@ class NMRProbe(object):
         t_90 = (np.pi/2)/(self.material.gyromagnetic_ratio*b1)
         return t_90
 
+    def generate_FID(self, t=None, mix_down=0*MHz, useAverage=True, noise=None):
+        if t is None:
+            t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
+        ideal_FID = self.pickup_flux(t, mix_down=mix_down, useAverage=useAverage)
+        if noise is not None:
+            FID_noise = noise(t)
+            return ideal_FID + FID_noise
+        return ideal_FID
+
+
     def pickup_flux(self, t, mix_down=0*MHz, useAverage=True):
         # Φ(t) = Σ N B₂(r) * μ(t) / I
         # a mix down_frequency can be propergated through and will effect the
@@ -303,6 +313,9 @@ class NMRProbe(object):
         #     with vec(B)(t) = mu0 * vec(M)(t) = mu0 * M0 * vec(mu)(t)
         #     with vec(A) = pi*r^2 * vec(B_coil)/<B_coil>
         # EMF = N * pi * r^2 * mu0 * sum( vec(B_coil)/<B_coil> * M0 * d/dt( vec(mu)(t) ) )
+
+        if not hasattr(self, "cells_mu_x"):
+            self.apply_rf_field()
 
         t = np.atleast_1d(t)
 
