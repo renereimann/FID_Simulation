@@ -7,11 +7,11 @@ with open('LICENSE') as f:
     license = f.read()
 
 setuptools.setup(
-    name="FID_Simulation", # Replace with your own username
+    name="FreeInductionDecay", # Replace with your own username
     version="0.0.1",
     author="Rene Reimann    ",
     author_email="rreimann@uni-mainz.de",
-    description="A package to simulate Free Induction Decay Signals",
+    description="A package to simulate Free Induction Decay signals in pulsed NMR",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/renereimann/FID_Simulation",
