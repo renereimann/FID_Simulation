@@ -272,11 +272,12 @@ class NMRProbe(object):
     def generate_FID(self, t=None, mix_down=0*MHz, useAverage=True, noise=None):
         if t is None:
             t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
-        ideal_FID = self.pickup_flux(t, mix_down=mix_down, useAverage=useAverage)
+
+        flux = self.pickup_flux(t, mix_down=mix_down, useAverage=useAverage)
         if noise is not None:
             FID_noise = noise(t)
-            return ideal_FID + FID_noise
-        return ideal_FID
+            flux += FID_noise
+        return flux, t
 
 
     def pickup_flux(self, t, mix_down=0*MHz, useAverage=True):
