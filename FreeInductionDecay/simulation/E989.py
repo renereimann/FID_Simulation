@@ -1,5 +1,6 @@
 from ..units import *
-from .probe import Coil, NMRProbe
+from .probe import NMRProbe
+from .coil import Coil
 from .material import PetroleumJelly, PP_Water
 from .magnet import RingMagnet
 
