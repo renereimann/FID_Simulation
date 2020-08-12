@@ -33,4 +33,17 @@
   * PP measurement
     * get software working
     * Analyze
-    * 
+    *
+
+* Coil -> implement multi layer coil
+          Dimensions in Ran's "MUON G-2 NMR FREQUENCY EXTRACTION" Sec. 5.3 Table 1
+* EMF ->  see Ran's "MUON G-2 NMR FREQUENCY EXTRACTION" Sec. 5.1 Eq. 36:
+          potential energy U = - current * Phi_muC
+          Phi_muC = vec(mu) dot_product vec(B_coil) / current
+
+          --> units
+            mu = A m²
+            B = T
+            current = A
+            --> U = J or eV
+            That corresponds for electrons with charge e a voltage in V.
