@@ -47,7 +47,7 @@ noise, etc.
 import numpy as np
 
 class ProbeSimulator(object):
-    def __init__(self):
+    def __init__(self, ProbeType):
         self.fGridSize = 0.01 # mm
 
         self.fCoilR = 2.3
@@ -72,8 +72,7 @@ class ProbeSimulator(object):
 
         self.fProbeCenter = [0.0, 0.0, 0.0]
 
-    def ConfigProbeType(self, Name):
-        if Name == "PlungingProbe":
+        if ProbeType == "PlungingProbe":
           self.fCoilR = 7.5
           self.fCoilL = 11.0
           self.fCoilN = 5
@@ -89,7 +88,7 @@ class ProbeSimulator(object):
 
           self.fCoilShiftConfig = self.fCoilL/(self.fCoilN-1)*np.arange(0, self.fCoilN)
 
-        elif Name == "TrolleyProbe":
+        elif ProbeType == "TrolleyProbe":
           self.fCoilR = 2.3
           self.fCoilL = 7.0
           self.fCoilN = 17
@@ -110,7 +109,7 @@ class ProbeSimulator(object):
           for i in range(9, 17):
             fCoilShiftConfig.append( (i-9)*CoilShift)
           self.fCoilShiftConfig = np.array(fCoilShiftConfig)
-        elif Name == "TrolleyProbeLong":
+        elif ProbeType == "TrolleyProbeLong":
           self.fCoilR = 2.3
           self.fCoilL = 15.0
           self.fCoilN = 32
@@ -133,7 +132,7 @@ class ProbeSimulator(object):
           for i in range(30, 32):
             fCoilShiftConfig.append((i-4)*CoilShift)
           self.fCoilShiftConfig = np.array(fCoilShiftConfig)
-        elif Name == "FixedProbe":
+        elif ProbeType == "FixedProbe":
           self.fCoilR = 2.3
           self.fCoilL = 15.0
           self.fCoilN = 32
