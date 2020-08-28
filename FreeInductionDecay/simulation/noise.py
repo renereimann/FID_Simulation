@@ -33,7 +33,7 @@ class WhiteNoise(Noise):
 
     def __call__(self, times, rng=None):
         if rng is None: rng = self.rng
-        return rng.normal(loc=0.0, scale=self.scale)
+        return rng.normal(loc=0.0, scale=self.scale, size=len(times))
 
 class FreqNoise(Noise):
     def __init__(self, power, scale, rng=None):
