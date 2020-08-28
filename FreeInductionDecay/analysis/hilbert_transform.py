@@ -33,15 +33,3 @@ class HilbertTransform(object):
 
         t, phi = self.PhaseFunction()
         ax.scatter(t, np.degrees(phi))
-
-"""
-def get_phase_from_hilbert(flux, window=None):
-
-    plt.figure()
-    plt.scatter(self.time, np.degrees(self.- 314.16700919*times/ms)%180)
-    plt.axhline(np.degrees(-1.57126946)%180, ls="--", color="k")
-    plt.xlim([0.4, 0.6])
-    plt.ylim(88, 92)
-
-get_phase_from_hilbert(flux, window=signal.hamming)
-"""
