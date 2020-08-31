@@ -6,6 +6,10 @@ from .magnet import RingMagnet
 
 class FixedProbe(NMRProbe):
     def __init__(self):
+        self.readout_length = 4*ms
+        self.sampling_rate_online = 10*MHz
+        self.sampling_rate_offline = 1*MHz
+        self.time_pretrigger = 409*us
         fix_probe_coil = Coil(turns=30,
                               length=15.0*mm,
                               diameter=4.6*mm,
@@ -20,6 +24,10 @@ class FixedProbe(NMRProbe):
 class PlungingProbe(NMRProbe):
     def __init__(self):
 
+        self.readout_length = 500*ms
+        self.sampling_rate_online = 10*MHz
+        self.sampling_rate_offline = self.sampling_rate_online
+        self.time_pretrigger = 0 # ???
         # L = 0.5 uH
         # C_p = 1-12 pF
         # C_s = 1-12 pF in series with L*C_p

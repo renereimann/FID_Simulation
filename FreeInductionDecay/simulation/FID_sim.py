@@ -44,7 +44,7 @@ class FID_simulation(object):
         self.cells_mu_z = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
-    def generate_FID(self, t=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000):
+    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -97,9 +97,13 @@ class FID_simulation(object):
         #            That corresponds for electrons with charge e a voltage in V.
         """)
 
-        if t is None:
-            t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
-        t = np.atleast_1d(t)
+        t = None
+        if time is None:
+            t = np.arange(0, self.probe.readout_length-self.probe.time_pretrigger,
+                          1/self.probe.sampling_rate_offline)
+            #t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
+        else:
+            t = np.atleast_1d(time)
 
         if not hasattr(self, "cells_mu_x"):
             self.apply_rf_field()
@@ -133,6 +137,11 @@ class FID_simulation(object):
             # flux.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
         flux = np.concatenate(flux)/self.N_cells
 
+        if time is None:
+            t_pre = np.arange(0, self.probe.time_pretrigger, 1/self.probe.sampling_rate_offline)
+            f_pre = np.zeros_like(t_pre)
+            t = np.concatenate([t_pre, t+self.probe.time_pretrigger])
+            flux = np.concatenate([f_pre, flux])
         if noise is not None:
             FID_noise = noise(t)
             flux += FID_noise
