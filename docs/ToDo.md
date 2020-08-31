@@ -47,3 +47,29 @@
             current = A
             --> U = J or eV
             That corresponds for electrons with charge e a voltage in V.
+
+* Implement Baseline
+* Implement Distortion
+* Double check Noise w.r.t. Ran
+* Chi2 Fit  
+  * implement unweighted
+  * implement diagonal
+  * implement COV white Noise
+  * implement COV data
+  * implement smoothing effects
+  * implement uncertainty estimate
+  * implement chi2 -pvalue
+* implement noise fitting at beginning / end of waveform
+* recursive zero-crossing
+* coils with multi layers
+* g(omega) histogram
+* EMF
+* Docu
+
+Tests
+* bias
+* uncertainty / RMS
+  * omega_fit - omega_true
+  * omega_true - omega_center
+  * vs fit window Length
+  * vs polynomial order
