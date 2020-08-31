@@ -122,6 +122,10 @@ class FID_simulation(object):
         else:
             t = np.atleast_1d(time)
 
+        if pretrigger:
+            N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
+            t = t[:-N_pre]
+
         if not hasattr(self, "cells_mu_T"):
             self.apply_rf_field()
 
@@ -149,7 +153,8 @@ class FID_simulation(object):
 
         if pretrigger:
             N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
-            flux = np.concatenate([np.zeros(N_pre), flux[:-N_pre]])
+            t = np.arange(0, self.probe.readout_length, 1/self.probe.sampling_rate_offline)
+            flux = np.concatenate([np.zeros(N_pre), flux])
         if noise is not None:
             FID_noise = noise(t)
             flux += FID_noise
