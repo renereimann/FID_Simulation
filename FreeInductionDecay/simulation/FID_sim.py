@@ -32,7 +32,13 @@ class FID_simulation(object):
         # calculate magnetization of cells
         # dipoles are aligned with the external field at the beginning
         self.cells_magnetization = self.probe.magnetization(self.cells_B0)
-        #self.cells_dipole_moment_mag = self.cells_magnetization * self.probe.V_cell/N_cells
+
+    def frequency_spectrum(self, mix_down=0*MHz):
+        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+        return omega_mixed
+
+    def equalibrium(self):
+        pass
 
     def apply_rf_field(self, time=None):
         if time is None:
@@ -48,12 +54,12 @@ class FID_simulation(object):
     def spin_echo(self, time_pi=None, pretrigger=False, **kwargs):
         if time_pi is None:
             time_pi = self.probe.readout_length
+
         # apply pi/2 pulse
         self.apply_rf_field()
 
         # FID
-        #t = np.arange(0, time_pi, 1/self.probe.sampling_rate_offline)
-        flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs) #time=t,
+        flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs)
 
         # apply pi pulse
         self.cells_phase0 *= -1
