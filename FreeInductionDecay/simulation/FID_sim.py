@@ -44,6 +44,28 @@ class FID_simulation(object):
         self.cells_mu_z = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
 
+    def spin_echo(self):
+        t90 = self.probe.estimate_rf_pulse(alpha=np.pi/2)
+        self.apply_rf_field(t90)
+        t = np.arange(0, self.probe.readout_length, 1/self.probe.sampling_rate_offline)
+        flux, time = self.generate_FID(time=t, mix_Down=*MHz)
+
+        t_pi = t[-1]
+
+        magnitude = self.cells_mu_T*np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
+        phase = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
+        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+
+        argument = omega_mixed,t_pi - phase[:, None]
+        # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
+        # already assumed that dmu_y_dt is 0, so we can leave out that term
+        B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument)
+                                       + self.cells_B1_z[:, None]*np.sin(argument))*
+
+                                       (np.exp(-this_t/self.probe.material.T2)[:, None]).T
+        #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+
+
     def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
