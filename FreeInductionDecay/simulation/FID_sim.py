@@ -124,7 +124,7 @@ class FID_simulation(object):
         else:
             t = np.atleast_1d(time)
 
-        if not hasattr(self, "cells_mu_x"):
+        if not hasattr(self, "cells_mu_T"):
             self.apply_rf_field()
 
         magnitude = np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
