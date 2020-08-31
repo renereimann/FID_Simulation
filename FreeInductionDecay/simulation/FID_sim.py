@@ -45,25 +45,25 @@ class FID_simulation(object):
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
         self.cells_phase0 = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
 
-    def spin_echo(self, mix_down=0*MHz, time_pi=None):
+    def spin_echo(self, time_pi=None, pretrigger=False, **kwargs):
         if time_pi is None:
             time_pi = self.probe.readout_length
         # apply pi/2 pulse
         self.apply_rf_field()
 
         # FID
-        t = np.arange(0, time_pi, 1/self.probe.sampling_rate_offline)
-        flux1, time1 = self.generate_FID(time=t, mix_down=mix_down)
+        #t = np.arange(0, time_pi, 1/self.probe.sampling_rate_offline)
+        flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs) #time=t,
 
         # apply pi pulse
         self.cells_phase0 *= -1
 
         # spin echo
         t = np.arange(0, 2*time_pi, 1/self.probe.sampling_rate_offline)
-        flux2, time2 = self.generate_FID(time=t, mix_down=mix_down)
+        flux2, time2 = self.generate_FID(time=t, **kwargs)
         return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
 
-    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000):
+    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000, pretrigger=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -118,9 +118,7 @@ class FID_simulation(object):
 
         t = None
         if time is None:
-            t = np.arange(0, self.probe.readout_length-self.probe.time_pretrigger,
-                          1/self.probe.sampling_rate_offline)
-            #t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
+            t = np.arange(0, self.probe.readout_length, 1/self.probe.sampling_rate_offline)
         else:
             t = np.atleast_1d(time)
 
@@ -149,11 +147,9 @@ class FID_simulation(object):
             self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
         flux = np.concatenate(flux)/self.N_cells
 
-        if time is None:
-            t_pre = np.arange(0, self.probe.time_pretrigger, 1/self.probe.sampling_rate_offline)
-            f_pre = np.zeros_like(t_pre)
-            t = np.concatenate([t_pre, t+self.probe.time_pretrigger])
-            flux = np.concatenate([f_pre, flux])
+        if pretrigger:
+            N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
+            flux = np.concatenate([np.zeros(N_pre), flux[:-N_pre]])
         if noise is not None:
             FID_noise = noise(t)
             flux += FID_noise
