@@ -43,8 +43,27 @@ class FID_simulation(object):
         self.cells_mu_y = np.cos(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_z = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+        self.cells_phase0 = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
 
-    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000):
+    def spin_echo(self, time_pi=None, pretrigger=False, **kwargs):
+        if time_pi is None:
+            time_pi = self.probe.readout_length
+        # apply pi/2 pulse
+        self.apply_rf_field()
+
+        # FID
+        #t = np.arange(0, time_pi, 1/self.probe.sampling_rate_offline)
+        flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs) #time=t,
+
+        # apply pi pulse
+        self.cells_phase0 *= -1
+
+        # spin echo
+        t = np.arange(0, 2*time_pi, 1/self.probe.sampling_rate_offline)
+        flux2, time2 = self.generate_FID(time=t, **kwargs)
+        return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
+
+    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000, pretrigger=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -99,35 +118,28 @@ class FID_simulation(object):
 
         t = None
         if time is None:
-            t = np.arange(0, self.probe.readout_length-self.probe.time_pretrigger,
-                          1/self.probe.sampling_rate_offline)
-            #t = np.linspace(0*ms, 10*ms, 10000) # 1 MSPS
+            t = np.arange(0, self.probe.readout_length, 1/self.probe.sampling_rate_offline)
         else:
             t = np.atleast_1d(time)
 
-        if not hasattr(self, "cells_mu_x"):
+        if pretrigger:
+            N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
+            t = t[:-N_pre]
+
+        if not hasattr(self, "cells_mu_T"):
             self.apply_rf_field()
 
-        magnitude = self.cells_mu_T*np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
-        phase = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
+        magnitude = np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
 
         flux = []
-        idx_end = 0
-        while idx_end != -1:
-            idx_start = idx_end
-            this_t = None
-            if self.N_cells* len(t[idx_start:]) > max_memory:
-                idx_end = idx_start + max_memory//self.N_cells
-                this_t = t[idx_start:idx_end]
-            else:
-                idx_end = -1
-                this_t = t[idx_start:]
-
-            argument = np.outer(omega_mixed,this_t) - phase[:, None]
+        chunks = int(self.N_cells* len(t) / max_memory + 1)
+        for this_t in np.array_split(t, chunks):
+            this_t = this_t-this_t[0]
+            argument = np.outer(omega_mixed,this_t) - self.cells_phase0[:, None]
             # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
             # already assumed that dmu_y_dt is 0, so we can leave out that term
-            B_x_dmu_dt = magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
+            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
             if useAverage:
                 flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2 /np.mean(self.cells_B1[:, None]))
@@ -135,13 +147,14 @@ class FID_simulation(object):
                 flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None]/self.cells_B1[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             # Alternative
             # flux.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
+            self.cells_phase0 -= omega_mixed*this_t[-1]
+            self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
         flux = np.concatenate(flux)/self.N_cells
 
-        if time is None:
-            t_pre = np.arange(0, self.probe.time_pretrigger, 1/self.probe.sampling_rate_offline)
-            f_pre = np.zeros_like(t_pre)
-            t = np.concatenate([t_pre, t+self.probe.time_pretrigger])
-            flux = np.concatenate([f_pre, flux])
+        if pretrigger:
+            N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
+            t = np.arange(0, self.probe.readout_length, 1/self.probe.sampling_rate_offline)
+            flux = np.concatenate([np.zeros(N_pre), flux])
         if noise is not None:
             FID_noise = noise(t)
             flux += FID_noise
