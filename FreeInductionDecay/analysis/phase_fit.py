@@ -24,6 +24,19 @@ def fit_range(time, amp, edge_ignore=0.1, frac=0.7, return_mask=False):
     return t_range
 
 
+def chi2_min_diagonal(time, phi, amp, time_range=[0,2], sigma_N=1):
+    mask = np.logical_and(time > np.min(time_range), time < np.max(time_range))
+    time = time[mask][::2] # downsample by factor 2
+    phi = phi[mask][::2]   # downsample by factor 2
+    amp = amp[mask][::2]   # downsample by factor 2
+    sigma_inv = amp**2/sigma_n**2
+    chi2 = lambda p: np.sum(sigma_inv*(fit_func(time, p) - phi)**2)
+
+    x0 = np.random.normal(size=5)
+    x0[1] += 314
+    res = minimize(chi2, x0)
+    return res
+
 def poly_fit(time, phi,time_range=[0,2]):
     mask = np.logical_and(time > np.min(time_range), time < np.max(time_range))
 
