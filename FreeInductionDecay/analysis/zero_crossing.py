@@ -3,6 +3,13 @@ from scipy.interpolate import UnivariateSpline
 
 from ..units import uV, ms
 
+# David Flay has implemented that in a recursive / iterative procedure (including)
+# baseliine correction (up to a precision of 1e-16 s)
+# See Field Paper Sec. II B 2
+
+# There is a second definition of ZeroCrossing that is used for baseline extraction
+# This is described in Rans internal note and followed below
+
 class ZeroCrossing(object):
     def __init__(self, times, flux):
         if len(times) != len(flux):

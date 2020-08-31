@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.ndimage.filters import uniform_filter1d
 
+# optimal window size is 2pi/omega_bar
 def running_mean(time, val, window_size):
     N = int(window_size/np.diff(time)[0])
     if N%2 == 0:
