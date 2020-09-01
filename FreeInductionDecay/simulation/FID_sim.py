@@ -33,9 +33,16 @@ class FID_simulation(object):
         # dipoles are aligned with the external field at the beginning
         self.cells_magnetization = self.probe.magnetization(self.cells_B0)
 
-    def frequency_spectrum(self, mix_down=0*MHz):
-        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+    def frequency_spectrum(self):
+        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
         return omega_mixed
+
+    def mean_frequency(self):
+        return np.mean(frequency_spectrum)
+
+    def central_frequency(self):
+        B0 = np.sqrt(np.sum(self.B_field(0, 0, 0)**2, axis=-1))
+        return (self.probe.material.gyromagnetic_ratio*B0-2*np.pi*self.probe.mix_down)
 
     def equalibrium(self):
         pass
@@ -69,7 +76,7 @@ class FID_simulation(object):
         flux2, time2 = self.generate_FID(time=t, **kwargs)
         return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
 
-    def generate_FID(self, time=None, mix_down=0*MHz, useAverage=True, noise=None, max_memory=10000000, pretrigger=False):
+    def generate_FID(self, time=None, useAverage=True, noise=None, max_memory=10000000, pretrigger=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -136,7 +143,7 @@ class FID_simulation(object):
             self.apply_rf_field()
 
         magnitude = np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
-        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*mix_down)
+        omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
 
         flux = []
         chunks = int(self.N_cells* len(t) / max_memory + 1)

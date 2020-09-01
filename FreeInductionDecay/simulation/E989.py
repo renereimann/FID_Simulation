@@ -10,6 +10,7 @@ class FixedProbe(NMRProbe):
         self.sampling_rate_online = 10*MHz
         self.sampling_rate_offline = 1*MHz
         self.time_pretrigger = 409*us
+        self.mix_down = 61.74*MHz
         fix_probe_coil = Coil(turns=32, # 0-27 equally distributed, 28-29 at one end, 30-31 at the other
                               length=15.0*mm,
                               diameter=4.6*mm,
@@ -26,6 +27,7 @@ class TrolleyProbe(NMRProbe):
         self.sampling_rate_online = 62/61.74e6
         self.sampling_rate_offline = self.sampling_rate_online
         self.time_pretrigger = 0.3*ms
+        self.mix_down = 61.74*MHz
         trolley_coil = Coil(turns=18, # two layers a 9 turns
                               length=7.0*mm,
                               diameter=4.6*mm,
@@ -44,6 +46,7 @@ class PlungingProbe(NMRProbe):
         self.sampling_rate_online = 10*MHz
         self.sampling_rate_offline = self.sampling_rate_online
         self.time_pretrigger = 0 # ???
+        self.mix_down = 61.74*MHz
         # L = 0.5 uH
         # C_p = 1-12 pF
         # C_s = 1-12 pF in series with L*C_p
