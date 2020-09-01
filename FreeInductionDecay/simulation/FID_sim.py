@@ -38,10 +38,13 @@ class FID_simulation(object):
         return omega_mixed
 
     def mean_frequency(self):
-        return np.mean(frequency_spectrum)
+        return np.mean(self.frequency_spectrum())
+
+    def std_frequency(self):
+        return np.std(self.frequency_spectrum())
 
     def central_frequency(self):
-        B0 = np.sqrt(np.sum(self.B_field(0, 0, 0)**2, axis=-1))
+        B0 = np.sqrt(np.sum(np.array(self.B_field(0, 0, 0))**2, axis=-1))
         return (self.probe.material.gyromagnetic_ratio*B0-2*np.pi*self.probe.mix_down)
 
     def equalibrium(self):
@@ -76,7 +79,7 @@ class FID_simulation(object):
         flux2, time2 = self.generate_FID(time=t, **kwargs)
         return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
 
-    def generate_FID(self, time=None, useAverage=True, noise=None, max_memory=10000000, pretrigger=False):
+    def generate_FID(self, time=None, useAverage=True, noise=None, max_memory=10000000, pretrigger=False, reset=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -139,7 +142,7 @@ class FID_simulation(object):
             N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
             t = t[:-N_pre]
 
-        if not hasattr(self, "cells_mu_T"):
+        if not hasattr(self, "cells_mu_T") or reset:
             self.apply_rf_field()
 
         magnitude = np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
