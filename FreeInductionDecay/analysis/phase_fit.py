@@ -58,7 +58,7 @@ def poly_fit(time, phi,time_range=[0,2], x0=None, tol=1e-4):
     res = minimize(chi2, x0, tol=tol)
     return res
 
-def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoothing=True, tol=None, x0=None, window_size=0.05*ms):
+def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoothing=True, tol=None, x0=None, window_size=1/(314*kHz), fit_window_fact=2):
     hilbert = HilbertTransform(time, flux)
     _, env = hilbert.EnvelopeFunction()
     _, phi = hilbert.PhaseFunction()
@@ -67,7 +67,7 @@ def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoot
     if smoothing:
         _, phi = running_mean(time,  phi, window_size=window_size)
 
-    width = t_range[1]-t_range[0]
+    width = (t_range[1]-t_range[0])/fit_window_fact
     mask = np.logical_and(time > t_range[0], time < t_range[1])
     res = poly_fit((time-t0)/width, phi, time_range=(t_range-t0)/width, x0=x0, tol=tol)
     phi_fit = fit_func((time[mask]-t0)/width, res.x)
@@ -91,7 +91,7 @@ def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoot
         plt.legend()
     return frequency
 
-def FID_analysis(time, flux, edge_ignore=0.1*ms, frac=0.7, probe=None, **kwargs):
+def FID_analysis(time, flux, edge_ignore=60*us, frac=0.7, probe=None, **kwargs):
     t0 = probe.time_pretrigger
     _, env = HilbertTransform(time, flux).EnvelopeFunction()
     t_range = fit_range(time, env,
