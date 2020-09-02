@@ -35,13 +35,16 @@ class FID_simulation(object):
 
     def frequency_spectrum(self):
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
-        return omega_mixed
+        weights = np.sqrt(self.cells_B1_x**2+self.cells_B1_z**2)*self.cells_mu_T
+        return omega_mixed, weights/np.mean(weights)
 
     def mean_frequency(self):
-        return np.mean(self.frequency_spectrum())
+        f, w = self.frequency_spectrum()
+        return np.average(f, weights=w)
 
     def std_frequency(self):
-        return np.std(self.frequency_spectrum())
+        f, w = self.frequency_spectrum()
+        return np.sqrt(np.average((f-self.mean_frequency())**2, weights=w))
 
     def central_frequency(self):
         B0 = np.sqrt(np.sum(np.array(self.B_field(0, 0, 0))**2, axis=-1))

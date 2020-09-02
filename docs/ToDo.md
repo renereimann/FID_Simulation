@@ -51,7 +51,6 @@
 * Implement Baseline
 * Implement Distortion
 * Implement experimental Noise
-* weighted mean for spectrogram
 * Chi2 Fit  
   * implement unweighted
   * implement diagonal
@@ -66,7 +65,7 @@
 * EMF
 
 Tests
-* uncertainty due to fitter 
+* uncertainty due to fitter
 * bias
 * uncertainty / RMS
   * omega_fit - omega_true
