@@ -66,6 +66,7 @@
 * EMF
 
 Tests
+* uncertainty due to fitter 
 * bias
 * uncertainty / RMS
   * omega_fit - omega_true
