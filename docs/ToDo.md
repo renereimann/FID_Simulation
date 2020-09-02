@@ -50,7 +50,8 @@
 
 * Implement Baseline
 * Implement Distortion
-* Double check Noise w.r.t. Ran
+* Implement experimental Noise
+* weighted mean for spectrogram
 * Chi2 Fit  
   * implement unweighted
   * implement diagonal
@@ -62,9 +63,7 @@
 * implement noise fitting at beginning / end of waveform
 * recursive zero-crossing
 * coils with multi layers
-* g(omega) histogram
 * EMF
-* Docu
 
 Tests
 * bias
