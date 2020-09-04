@@ -34,6 +34,8 @@ class FID_simulation(object):
         self.cells_magnetization = self.probe.magnetization(self.cells_B0)
 
     def frequency_spectrum(self):
+        if not hasattr(self, "cells_mu_T"):
+            self.apply_rf_field()
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
         weights = np.sqrt(self.cells_B1_x**2+self.cells_B1_z**2)*self.cells_mu_T
         return omega_mixed, weights/np.mean(weights)
