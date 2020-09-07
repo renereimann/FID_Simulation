@@ -155,8 +155,9 @@ class FID_simulation(object):
 
         flux = []
         chunks = int(self.N_cells* len(t) / max_memory + 1)
+        t0 = t[0]
         for this_t in np.array_split(t, chunks):
-            this_t = this_t-this_t[0]
+            this_t = this_t - t0
             argument = np.outer(omega_mixed,this_t) - self.cells_phase0[:, None]
             # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
             # already assumed that dmu_y_dt is 0, so we can leave out that term
@@ -168,8 +169,10 @@ class FID_simulation(object):
                 flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None]/self.cells_B1[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             # Alternative
             # flux.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
+            t0 += this_t[-1]
             self.cells_phase0 -= omega_mixed*this_t[-1]
             self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
+
         flux = np.concatenate(flux)/self.N_cells
 
         if pretrigger:
