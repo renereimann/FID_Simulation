@@ -36,6 +36,16 @@ def fit_range(time, amp, edge_ignore=0.1*ms, frac=0.7,
         return t_range, np.logical_and(time > t_min, time < t_max)
     return t_range
 
+def fit_range_frac(time, amp, frac=0.7, t0=None):
+    # closest index to t0
+    idx = np.argmin(np.abs(time - t0))
+    # threshold relative to t0
+    thres = frac * amp[idx]
+
+    t_start = np.max(time[np.logical_and(time < t0, amp < thres)])
+    t_stop = np.min(time[np.logical_and(time > t0, amp < thres)])
+    return np.array([t_start, t_stop])
+
 def chi2_min_diagonal(time, phi, amp, time_range=[0,2], sigma_N=1):
     mask = np.logical_and(time > np.min(time_range), time < np.max(time_range))
     time = time[mask][::2] # downsample by factor 2
@@ -106,9 +116,10 @@ def FID_analysis(time, flux, edge_ignore=60*us, frac=0.7, probe=None, **kwargs):
         plt.xlim(xmin=t0/ms*0.95)
     return frequency
 
-def Echo_analysis(time, flux, t_window=0.5*ms, probe=None, **kwargs):
+def Echo_analysis(time, flux, frac=0.7, probe=None, **kwargs):
     t0 = 2*probe.readout_length-probe.time_pretrigger
-    t_range = np.array([t0-t_window, t0+t_window])
+    _, env = HilbertTransform(time, flux).EnvelopeFunction()
+    t_range = fit_range_frac(time, env, frac=frac, t0=t0)
     frequency = phase_analysis(time, flux, t0, t_range, **kwargs)
 
     if "plotting" in kwargs.keys() and kwargs["plotting"]:
