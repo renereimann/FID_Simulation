@@ -68,7 +68,7 @@ def poly_fit(time, phi,time_range=[0,2], x0=None, tol=1e-4):
     res = minimize(chi2, x0, tol=tol)
     return res
 
-def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoothing=True, tol=None, x0=None, window_size=1/(314*kHz), fit_window_fact=2):
+def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoothing=True, tol=None, x0=None, window_size=1/(314*kHz), fit_window_fact=2, **kwargs):
     hilbert = HilbertTransform(time, flux)
     _, env = hilbert.EnvelopeFunction()
     _, phi = hilbert.PhaseFunction()
@@ -80,7 +80,7 @@ def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoot
     width = (t_range[1]-t_range[0])/fit_window_fact
     mask = np.logical_and(time > t_range[0], time < t_range[1])
     res = poly_fit((time-t0)/width, phi, time_range=(t_range-t0)/width, x0=x0, tol=tol)
-    phi_fit = fit_func((time[mask]-t0)/width, res.x)
+    phi_fit = fit_func((time-t0)/width, res.x)
     frequency = res.x[1]/width
     phi0 = res.x[0]
 
@@ -91,7 +91,8 @@ def phase_analysis(time, flux, t0, t_range, verbose=False, plotting=False, smoot
         plt.plot(time/ms, phi_raw - phi0 - frequency*(time-t0), color="b", label="raw FID")
         if smoothing:
             plt.plot(time/ms, phi - phi0 - frequency*(time-t0), color="red", label="smoothed FID")
-        plt.plot(time[mask]/ms, phi_fit - phi0 - frequency*(time[mask]-t0), color="k", ls="--", label="fit")
+        #plt.plot(time[mask]/ms, phi_fit[mask] - phi0 - frequency*(time[mask]-t0), color="k", ls="--", label="fit")
+        plt.plot(time/ms, phi_fit - phi0 - frequency*(time-t0), color="k", ls="--", label="fit")
         plt.grid()
         plt.axvspan(*(t_range/ms), color="gray", alpha=0.2)
         plt.ylim(-0.1, 0.2)
