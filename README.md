@@ -1,5 +1,5 @@
 # FID_Simulation
-The repository contains scripts to generate simulations of pNMR FID signals.
+The repository contains scripts to generate simulations of pulsed Nuclear Magnetic Resonance (pNMR) free induction decay (FID) signals.
 
 # Installation
 
