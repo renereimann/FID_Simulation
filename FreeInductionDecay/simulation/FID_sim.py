@@ -9,8 +9,16 @@ class FID_simulation(object):
         self.rng = np.random.RandomState(seed)
 
         self.initialize_cells(N_cells)
+        # by initializing we want to start in equalibrium
+        self.equalibrium()
 
     def initialize_cells(self, N_cells):
+        """Generates cells randomly distriubted in the probe sample.
+        Calculates the external magnetic field at each cell point.
+        Calculates the coil magnetic field at each cell point.
+        Calculates the magnitude of the magnetization of each cell based on the
+        external field.
+        """
         # initialize cells
         self.N_cells = N_cells
         self.cells_x, self.cells_y, self.cells_z = self.probe.random_samples(self.rng, N_cells)
@@ -31,11 +39,10 @@ class FID_simulation(object):
 
         # calculate magnetization of cells
         # dipoles are aligned with the external field at the beginning
+        # that is the amplitude not the orientation
         self.cells_magnetization = self.probe.magnetization(self.cells_B0)
 
     def frequency_spectrum(self):
-        if not hasattr(self, "cells_mu_T"):
-            self.apply_rf_field()
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
         weights = np.sqrt(self.cells_B1_x**2+self.cells_B1_z**2)*self.cells_mu_T
         return omega_mixed, weights/np.mean(weights)
@@ -53,16 +60,42 @@ class FID_simulation(object):
         return (self.probe.material.gyromagnetic_ratio*B0-2*np.pi*self.probe.mix_down)
 
     def equalibrium(self):
-        pass
+        # in equalibrium the magnetization points along the main field direction
+        # which we assume to be the y direction.
+        # The mu values are normalized to the -1 to 1 range.
+        self.cells_mu_x = np.zeros_like(self.cells_magnetization)
+        self.cells_mu_y = np.ones_like(self.cells_magnetization)
+        self.cells_mu_z = np.zeros_like(self.cells_magnetization)
+        # this is a heavy over representation. we either need x, y, z
+        # or we need y, T, phase
+        # Still have to decide on which to use
 
+        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+        # the phase (angle in the x,z plane) is not defined if both x and
+        # z-components are zero. So we set the phase to zero.
+        self.cells_phase0 = np.zeros_like(self.cells_magnetization)
+
+    # rename rf pulse ideal
+    # that should not assume that we start in equalibrium,
+    # so make it work for pulse duration of any time and any starting magnetization
     def apply_rf_field(self, time=None):
+        ###
+        ### angle of rotation axis: theta
+        ### tan(theta) = B_RF / DeltaB
+        ### DeltaB = - Omega/gamma
+        ### Omega = omega_0 + omega_rf
+        ### omega_0 = - gamma B0
+        ### --> tan(theta) = gamma B_RF / (gamma B_0 - omega_RF)
+        ###
+        ### angle by which to rotate: beta
+        ###
         if time is None:
             time = self.probe.estimate_rf_pulse()
 
         # aproximation
         self.cells_mu_x = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
         self.cells_mu_y = np.cos(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_z = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        self.cells_mu_z = np.zeros_like(self.cells_mu_x)
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
         self.cells_phase0 = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
 
@@ -84,6 +117,7 @@ class FID_simulation(object):
         flux2, time2 = self.generate_FID(time=t, **kwargs)
         return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
 
+    # rename in free precession ideal
     def generate_FID(self, time=None, useAverage=True, noise=None, max_memory=10000000, pretrigger=False, reset=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
@@ -147,9 +181,6 @@ class FID_simulation(object):
             N_pre =  int(self.probe.time_pretrigger*self.probe.sampling_rate_offline)
             t = t[:-N_pre]
 
-        if not hasattr(self, "cells_mu_T") or reset:
-            self.apply_rf_field()
-
         magnitude = np.sqrt((self.probe.material.gyromagnetic_ratio*self.cells_B0)**2 + 1/self.probe.material.T2**2)
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
 
@@ -184,6 +215,7 @@ class FID_simulation(object):
             flux += FID_noise
         return flux, t
 
+    # rename bloch equation
     def solve_bloch_eq_nummerical(self, time=None, initial_condition=None, omega_rf=2*np.pi*61.79*MHz, with_relaxation=False, time_step=1.*ns, with_self_contribution=True):
         (r"""Solves the Bloch Equation numerically for a RF pulse with length `time`
         and frequency `omega_rf`.
@@ -289,5 +321,6 @@ class FID_simulation(object):
         self.cells_mu_y = M[1]
         self.cells_mu_z = M[2]
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
+        self.cells_phase0 = np.arctan2(M[2], M[0])
 
         return history
