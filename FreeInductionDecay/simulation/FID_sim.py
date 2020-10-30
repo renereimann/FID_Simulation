@@ -314,7 +314,7 @@ class FID_simulation(object):
             #wy = self.cells_B1_y/np.sum(np.sort(self.cells_B1_y))
             #wz = self.cells_B1_z/np.sum(np.sort(self.cells_B1_z))
             #history.append([rk_res.t, np.sum(np.sort(Mx*wx)), np.sum(np.sort(My*wy)), np.sum(np.sort(Mz*wz)), Mx[idx], My[idx], Mz[idx]])
-            history.append([rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]])
+            history.append((rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]))
             rk_res.step()
 
         self.cells_mu_x = M[0]
@@ -323,4 +323,4 @@ class FID_simulation(object):
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
         self.cells_phase0 = np.arctan2(M[2], M[0])
 
-        return history
+        return np.array(history, dtype=[(k, np.float) for k in ["time", "Mx_mean", "My_mean", "Mz_mean", "Mx_center", "My_center", "Mz_center"]])
