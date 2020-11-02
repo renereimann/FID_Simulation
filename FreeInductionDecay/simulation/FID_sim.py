@@ -191,14 +191,11 @@ class FID_simulation(object):
             argument = np.outer(omega_mixed,this_t) - self.cells_phase0[:, None]
             # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
             # already assumed that dmu_y_dt is 0, so we can leave out that term
-            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(self.cells_B1_x[:, None]*np.cos(argument) + self.cells_B1_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
+            weight_x = self.cells_B1_x/np.mean(self.cells_B1)
+            weight_z = self.cells_B1_z/np.mean(self.cells_B1)
+            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(weight[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
-            if useAverage:
-                flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2 /np.mean(self.cells_B1[:, None]))
-            else:
-                flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None]/self.cells_B1[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
-            # Alternative
-            # flux.append(µ0 * np.mean(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) )/(self.cells_B1[:, None])
+            flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             t0 += this_t[-1]
             self.cells_phase0 -= omega_mixed*this_t[-1]
             self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
