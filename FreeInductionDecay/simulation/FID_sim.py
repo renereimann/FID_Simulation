@@ -308,12 +308,9 @@ class FID_simulation(object):
         M = None
         while rk_res.status == "running":
             M = rk_res.y.reshape((3, self.N_cells))
-            Mx, My, Mz = M[0], M[1], M[2]                                       # 1
-            #wx = self.cells_B1_x/np.sum(np.sort(self.cells_B1_x))
-            #wy = self.cells_B1_y/np.sum(np.sort(self.cells_B1_y))
-            #wz = self.cells_B1_z/np.sum(np.sort(self.cells_B1_z))
-            #history.append([rk_res.t, np.sum(np.sort(Mx*wx)), np.sum(np.sort(My*wy)), np.sum(np.sort(Mz*wz)), Mx[idx], My[idx], Mz[idx]])
-            history.append((rk_res.t, np.mean(Mx), np.mean(My), np.mean(Mz), Mx[idx], My[idx], Mz[idx]))
+            Mx, My, Mz = M[0], M[1], M[2]
+            w = self.cells_B1/np.mean(self.cells_B1)
+            history.append((rk_res.t, np.mean(w*Mx), np.mean(w*My), np.mean(w*Mz), Mx[idx], My[idx], Mz[idx]))
             rk_res.step()
 
         self.cells_mu_x = M[0]
