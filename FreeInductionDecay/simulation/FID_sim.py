@@ -202,7 +202,8 @@ class FID_simulation(object):
             t0 += this_t[-1]
             self.cells_phase0 -= omega_mixed*this_t[-1]
             self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
-
+            self.cells_mu_x = self.cells_mu_T*np.cos(self.cells_phase0)
+            self.cells_mu_z = self.cells_mu_T*np.sin(self.cells_phase0)
         flux = np.concatenate(flux)/self.N_cells
 
         if pretrigger:
