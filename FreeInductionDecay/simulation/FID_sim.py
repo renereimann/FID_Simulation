@@ -61,15 +61,14 @@ class FID_simulation(object):
 
     def equalibrium(self):
         # in equalibrium the magnetization points along the main field direction
-        # which we assume to be the y direction.
-        # The mu values are normalized to the -1 to 1 range.
-        self.cells_mu_x = np.zeros_like(self.cells_magnetization)
-        self.cells_mu_y = np.ones_like(self.cells_magnetization)
-        self.cells_mu_z = np.zeros_like(self.cells_magnetization)
+        # the cells_mu is a unit vector
+        self.cells_mu_x = self.cells_B0_x/self.cells_B0
+        self.cells_mu_y = self.cells_B0_y/self.cells_B0
+        self.cells_mu_z = self.cells_B0_z/self.cells_B0
         # this is a heavy over representation. we either need x, y, z
         # or we need y, T, phase
         # Still have to decide on which to use
-
+        # Maybe we spend another class on that.
         self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
         # the phase (angle in the x,z plane) is not defined if both x and
         # z-components are zero. So we set the phase to zero.
