@@ -117,7 +117,7 @@ class FID_simulation(object):
         return np.concatenate([flux1, flux2]), np.concatenate([time1, time2+time_pi])
 
     # rename in free precession ideal
-    def generate_FID(self, time=None, useAverage=True, noise=None, max_memory=10000000, pretrigger=False, reset=False):
+    def generate_FID(self, time=None, noise=None, max_memory=10000000, pretrigger=False):
         # pickup_flux is depricated and generate_FID should be used instead.
         # Return typ is different. pickup_flux only returned flux and expected a
         # time series, while generate_FID can default to a time series and Returns
@@ -193,7 +193,7 @@ class FID_simulation(object):
             # already assumed that dmu_y_dt is 0, so we can leave out that term
             weight_x = self.cells_B1_x/np.mean(self.cells_B1)
             weight_z = self.cells_B1_z/np.mean(self.cells_B1)
-            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(weight[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
+            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(weight_x[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
             flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             t0 += this_t[-1]
