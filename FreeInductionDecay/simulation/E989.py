@@ -29,6 +29,7 @@ class TrolleyProbe(NMRProbe):
         self.sampling_rate_offline = self.sampling_rate_online
         self.time_pretrigger = 0.3*ms
         self.mix_down = 61.74*MHz
+        self.rf_pulse_frequency = 61.79*MHz
         trolley_coil = Coil(turns=18, # two layers a 9 turns
                               length=7.0*mm,
                               diameter=4.6*mm,
@@ -48,6 +49,7 @@ class PlungingProbe(NMRProbe):
         self.sampling_rate_offline = self.sampling_rate_online
         self.time_pretrigger = 0 # ???
         self.mix_down = 61.74*MHz
+        self.rf_pulse_frequency = 61.79*MHz
         # L = 0.5 uH
         # C_p = 1-12 pF
         # C_s = 1-12 pF in series with L*C_p
