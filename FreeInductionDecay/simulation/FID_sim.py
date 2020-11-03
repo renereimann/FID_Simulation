@@ -2,6 +2,57 @@ import numpy as np
 from scipy import integrate
 from ..units import *
 
+class UnitVectorArray(object):
+    """This class helps keeping track of different coordinate systems.
+    The class has implemented these two systems by now
+        1. x, y, z (cartesian coordinates)
+        2. L (longitudinal amplitude), T (transversal amplitude), phase (in transversal plane)
+
+    The relations between the coordinates are:
+        L = y
+        T = sqrt(x^2 + z^2)
+        phase = arctan2(z, x), which means +x axis 0 deg, +z axis 90 deg, -x axis 180 deg and -y axis 270 deg
+    """
+    def __init__(self, x, y, z):
+        self._x = x
+        self._y = y
+        self._z = z
+
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def y(self):
+        return self._y
+
+    @property
+    def z(self):
+        return self._z
+
+    @property
+    def L(self):
+        return self._y
+
+    @property
+    def T(self):
+        return np.sqrt(self._x**2 + self._z**2)
+
+    @property
+    def phase(self):
+        return np.arctan2(self._z, self._x)
+
+    def set_x_y_z(self, x, y, z):
+        norm = np.sqrt(x**2+y**2+z**2)
+        self._x = x/norm
+        self._y = y/norm
+        self._z = z/norm
+
+    def set_L_T_phase(self, L, T, phase):
+        self._x = T*np.cos(phase)
+        self._y = L
+        self._z = T*np.sin(phase)
+
 class FID_simulation(object):
     def __init__(self, probe, b_field, N_cells, seed):
         self.B_field = b_field
@@ -44,7 +95,7 @@ class FID_simulation(object):
 
     def frequency_spectrum(self):
         omega_mixed = (self.probe.material.gyromagnetic_ratio*self.cells_B0-2*np.pi*self.probe.mix_down)
-        weights = np.sqrt(self.cells_B1_x**2+self.cells_B1_z**2)*self.cells_mu_T
+        weights = np.sqrt(self.cells_B1_x**2+self.cells_B1_z**2)*self.cells_mu.T
         return omega_mixed, weights/np.mean(weights)
 
     def mean_frequency(self):
@@ -61,18 +112,9 @@ class FID_simulation(object):
 
     def equalibrium(self):
         # in equalibrium the magnetization points along the main field direction
-        # the cells_mu is a unit vector
-        self.cells_mu_x = self.cells_B0_x/self.cells_B0
-        self.cells_mu_y = self.cells_B0_y/self.cells_B0
-        self.cells_mu_z = self.cells_B0_z/self.cells_B0
-        # this is a heavy over representation. we either need x, y, z
-        # or we need y, T, phase
-        # Still have to decide on which to use
-        # Maybe we spend another class on that.
-        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
-        # the phase (angle in the x,z plane) is not defined if both x and
-        # z-components are zero. So we set the phase to zero.
-        self.cells_phase0 = np.zeros_like(self.cells_magnetization)
+        self.cells_mu = UnitVectorArray(self.cells_B0_x,
+                                        self.cells_B0_y,
+                                        self.cells_B0_z)
 
     # rename rf pulse ideal
     # that should not assume that we start in equalibrium,
@@ -92,11 +134,10 @@ class FID_simulation(object):
             time = self.probe.estimate_rf_pulse()
 
         # aproximation
-        self.cells_mu_x = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_y = np.cos(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        self.cells_mu_z = np.zeros_like(self.cells_mu_x)
-        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
-        self.cells_phase0 = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
+        L = np.cos(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        T = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
+        phase = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
+        self.cells_mu.set_L_T_phase(L, T, phase)
 
     def spin_echo(self, time_pi=None, pretrigger=False, **kwargs):
         if time_pi is None:
@@ -188,19 +229,18 @@ class FID_simulation(object):
         t0 = t[0]
         for this_t in np.array_split(t, chunks):
             this_t = this_t - t0
-            argument = np.outer(omega_mixed,this_t) - self.cells_phase0[:, None]
+            argument = np.outer(omega_mixed,this_t) - self.cells_mu.phase[:, None]
             # this is equal to Bx * dmu_x_dt + By * dmu_y_dt + Bz * dmu_z_dt
             # already assumed that dmu_y_dt is 0, so we can leave out that term
             weight_x = self.cells_B1_x/np.mean(self.cells_B1)
             weight_z = self.cells_B1_z/np.mean(self.cells_B1)
-            B_x_dmu_dt = self.cells_mu_T[:, None]*magnitude[:, None]*(weight_x[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
+            B_x_dmu_dt = self.cells_mu.T[:, None]*magnitude[:, None]*(weight_x[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
             #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
             flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             t0 += this_t[-1]
-            self.cells_phase0 -= omega_mixed*this_t[-1]
-            self.cells_mu_T *= np.exp(-this_t[-1]/self.probe.material.T2)
-            self.cells_mu_x = self.cells_mu_T*np.cos(self.cells_phase0)
-            self.cells_mu_z = self.cells_mu_T*np.sin(self.cells_phase0)
+            self.cells_mu.set_L_T_phase(self.cells_mu.L,
+                                        self.cells_mu.T * np.exp(-this_t[-1]/self.probe.material.T2),
+                                        self.cells_mu.phase - omega_mixed*this_t[-1])
         flux = np.concatenate(flux)/self.N_cells
 
         if pretrigger:
@@ -311,10 +351,6 @@ class FID_simulation(object):
             history.append((rk_res.t, np.mean(w*Mx), np.mean(w*My), np.mean(w*Mz), Mx[idx], My[idx], Mz[idx]))
             rk_res.step()
 
-        self.cells_mu_x = M[0]
-        self.cells_mu_y = M[1]
-        self.cells_mu_z = M[2]
-        self.cells_mu_T = np.sqrt(self.cells_mu_x**2 + self.cells_mu_z**2)
-        self.cells_phase0 = np.arctan2(M[2], M[0])
+        self.cells_mu.set_x_y_z(M[0], M[1], M[2])
 
         return np.array(history, dtype=[(k, np.float) for k in ["time", "Mx_mean", "My_mean", "Mz_mean", "Mx_center", "My_center", "Mz_center"]])
