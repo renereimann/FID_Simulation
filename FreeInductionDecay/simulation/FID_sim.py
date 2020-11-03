@@ -296,11 +296,8 @@ class FID_simulation(object):
 
         if initial_condition is None:
             # if no initial condition for the magnetization is given, we use the
-            # equilibrium magnetization, which is aligned with the direction of
-            # the external field.
-            initial_condition = [self.cells_B0_x/self.cells_B0,
-                                 self.cells_B0_y/self.cells_B0,
-                                 self.cells_B0_z/self.cells_B0]
+            # latest state of mu
+            initial_condition = [self.cells_mu.x, self.cells_mu.y, self.cells_mu.z]
 
         # pulse frequency
         def Bloch_equation(t, M):
@@ -331,10 +328,6 @@ class FID_simulation(object):
                 dMz -= Mz/self.probe.material.T2
             return np.array([dMx, dMy, dMz]).flatten()
 
-        #solution = integrate.odeint(Bloch_equation,
-        #                            y0=np.array(initial_condition).flatten(),
-        #                            t=np.linspace(0., time, int(time/ns)))
-
         rk_res = integrate.RK45(Bloch_equation,
                                 t0=0,
                                 y0=np.array(initial_condition).flatten(),
@@ -342,13 +335,13 @@ class FID_simulation(object):
                                 max_step=0.1*ns)  # about 10 points per oscillation
         history = []
 
-        idx = np.argmin(self.cells_x**2 + self.cells_y**2 + self.cells_z**2)
+        central_cell = np.argmin(self.cells_x**2 + self.cells_y**2 + self.cells_z**2)
         M = None
         while rk_res.status == "running":
             M = rk_res.y.reshape((3, self.N_cells))
             Mx, My, Mz = M[0], M[1], M[2]
             w = self.cells_B1/np.mean(self.cells_B1)
-            history.append((rk_res.t, np.mean(w*Mx), np.mean(w*My), np.mean(w*Mz), Mx[idx], My[idx], Mz[idx]))
+            history.append((rk_res.t, np.mean(w*Mx), np.mean(w*My), np.mean(w*Mz), Mx[central_cell], My[central_cell], Mz[central_cell]))
             rk_res.step()
 
         self.cells_mu.set_x_y_z(M[0], M[1], M[2])
