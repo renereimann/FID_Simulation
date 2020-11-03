@@ -139,18 +139,29 @@ class FID_simulation(object):
         phase = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
         self.cells_mu.set_L_T_phase(L, T, phase)
 
-    def spin_echo(self, time_pi=None, pretrigger=False, **kwargs):
+    def spin_echo(self, time_pi=None, pretrigger=False, useBloch=True, pi_2_pulse_length=None, **kwargs):
         if time_pi is None:
             time_pi = self.probe.readout_length
 
+        if pi_2_pulse_length is None:
+            pi_2_pulse_length = self.probe.estimate_rf_pulse()
+
         # apply pi/2 pulse
-        self.apply_rf_field()
+        if useBloch:
+            self.solve_bloch_eq_nummerical(time=pi_2_pulse_length,
+                                           omega_rf=2*np.pi*self.probe.rf_pulse_frequency)
+        else:
+            self.apply_rf_field()
 
         # FID
         flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs)
 
         # apply pi pulse
-        self.cells_phase0 *= -1
+        if useBloch:
+            self.solve_bloch_eq_nummerical(time=2*pi_2_pulse_length,
+                                           omega_rf=2*np.pi*self.probe.rf_pulse_frequency)
+        else:
+            self.cells_phase0 *= -1
 
         # spin echo
         t = np.arange(0, 2*time_pi, 1/self.probe.sampling_rate_offline)

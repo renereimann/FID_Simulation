@@ -11,6 +11,7 @@ class FixedProbe(NMRProbe):
         self.sampling_rate_offline = 1*MHz
         self.time_pretrigger = 409*us
         self.mix_down = 61.74*MHz
+        self.rf_pulse_frequency = 61.79*MHz
         fix_probe_coil = Coil(turns=32, # 0-27 equally distributed, 28-29 at one end, 30-31 at the other
                               length=15.0*mm,
                               diameter=4.6*mm,
