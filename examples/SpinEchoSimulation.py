@@ -9,42 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-N_ensamble = 100
-kwargs = {"frac": 0.7,
-          "tol": 1e-5, 
-          "window_size": 1/(50*kHz),
-          "smoothing": True,
-          "edge_ignore": 60*us,
-         }
-lin_grad = 0*ppm/cm
-quad_grad = 0*ppm/cm**2
-N_cells = 10000
-noise_scale = 0.2*uV
-
-for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
-    try:
-        # quadrupole
-        # 4 (x, -y, 0)
-        # 5 (z,  0, x)
-        # 6 (0, -y, z)
-        # 7 (y,  x, 0)
-        # 8 (0,  z, y)
-        # sextupoles
-        # 9 (x^2-y^2, -2xy, 0)
-        # 10 (2xz, -2yz, x^2-y^2)
-        # 11 (z^2-y^2, -2xy, 2xy)
-        # 12 (0, -2yz, z^2-y^2)
-        # 13 (2xy, x^2-y^2, 0)
-        # 14 (yz, xz, xy)
-        # 15 (0, z^2-y^2, 2yz)
-        # main field in y direction
-        # probe in z-direction
+def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1000, N_ensamble=100, noise_scale=0.2*uV, seed=1, **kwargs):
         b_field = StorageRingMagnet( ) # 1,45 T
         B0 = b_field.An[2]
         b_field.An[8] = lin_grad*B0
-        b_field.An[15] = quad_grad*B0 
-        sim = FID_simulation(FixedProbe(), b_field, N_cells=N_cells, seed=1)
-        noise = WhiteNoise(scale=noise_scale) # ~1-2% of max amplitude # max amp ~17 uV
+        b_field.An[15] = quad_grad*B0
+        sim = FID_simulation(FixedProbe(), b_field, N_cells=N_cells, seed=seed)
+        noise = WhiteNoise(scale=noise_scale)
         grad_str = "%d_ppm_cm_%d_ppm_cm2"%(lin_grad/ppm*cm, quad_grad/ppm*cm**2)
         kwargs["probe"] = sim.probe
 
@@ -52,7 +23,6 @@ for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
         hi, edg = np.histogram(freq/kHz, bins=np.linspace((sim.mean_frequency()-3*sim.std_frequency())/kHz,(sim.mean_frequency()+3*sim.std_frequency())/kHz,31), weights=w)
         plt.figure()
         plt.step(edg, np.concatenate([hi, [0]]), where="post", label="cells in probe")
-        #plt.xlim(304, 324)
         plt.ylim(ymin=0)
         plt.axvline(sim.mean_frequency()/kHz, ls="--", color="k", label="Mean=%.2f kHz"%(sim.mean_frequency()/kHz))
         plt.axvline(sim.central_frequency()/kHz, ls=":", color="k", label="Central=%.2f kHz"%(sim.central_frequency()/kHz))
@@ -120,7 +90,7 @@ for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
                 ensemble_FID = [FID_analysis(time_echo, flux_echo, fit_window_fact=fit_window_fact, **kwargs)/kHz for i in range(N_ensamble)]
                 fid_scatter.append(np.std(ensemble_FID))
             echo_scatter = []
-            for fit_window_fact in f_scan:  
+            for fit_window_fact in f_scan:
                 ensemble_Echo = [Echo_analysis(time_echo, flux_echo, fit_window_fact=fit_window_fact, **kwargs)/kHz for i in range(N_ensamble)]
                 echo_scatter.append(np.std(ensemble_Echo))
 
@@ -151,9 +121,9 @@ for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
         ensemble_Echo = []
         for i in range(N_ensamble):
             N = noise(time_echo)
-            freq_FID = FID_analysis(time_echo, flux_echo+N, 
+            freq_FID = FID_analysis(time_echo, flux_echo+N,
                                 fit_window_fact=f_FID, **kwargs)
-            freq_echo = Echo_analysis(time_echo, flux_echo+N, 
+            freq_echo = Echo_analysis(time_echo, flux_echo+N,
                                  fit_window_fact=f_Echo, **kwargs)
             ensemble_FID.append(freq_FID/kHz)
             ensemble_Echo.append(freq_echo/kHz)
@@ -170,21 +140,38 @@ for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
         t_range_fid = fit_range(time_echo, env_echo, frac=kwargs["frac"], edge_ignore=kwargs["edge_ignore"],
                                 pretrigger=kwargs["probe"].time_pretrigger, readout_length=kwargs["probe"].readout_length)
 
-        res={"FID": {"f": f_FID, 
-                     "t_range": (t_range_fid[0]/ms, t_range_fid[1]/ms), 
-                     "t_range_unit": "ms", 
-                     "bias": bias_FID, 
+        res={"FID": {"f": f_FID,
+                     "t_range": (t_range_fid[0]/ms, t_range_fid[1]/ms),
+                     "t_range_unit": "ms",
+                     "bias": bias_FID,
                      "bias_unit": "kHz",
-                     "uncertenty": unce_FID, 
-                     "uncertenty_unit": "kHz"}, 
-             "Echo": {"f": f_Echo, 
-                      "t_range": (t_range_echo[0]/ms, t_range_echo[1]/ms), 
-                      "t_range_unit": "ms", 
-                      "bias": bias_Echo, 
+                     "uncertenty": unce_FID,
+                     "uncertenty_unit": "kHz"},
+             "Echo": {"f": f_Echo,
+                      "t_range": (t_range_echo[0]/ms, t_range_echo[1]/ms),
+                      "t_range_unit": "ms",
+                      "bias": bias_Echo,
                       "bias_unit": "kHz",
-                      "uncertenty": unce_Echo, 
+                      "uncertenty": unce_Echo,
                       "uncertenty_unit": "kHz"}, }
         with open("./data/SpinEcho/Freq_extraction_%s.pickle"%grad_str, "wb") as open_file:
             pickle.dump(res, open_file)
-    except:
-        continue
+
+if __name__=="__main__":
+    kwargs = {"frac": 0.7,
+              "tol": 1e-5,
+              "window_size": 1/(50*kHz),
+              "smoothing": True,
+              "edge_ignore": 60*us,
+             }
+    for lin_grad in np.linspace(24, 40, 8+1)*ppm/cm:
+        try:
+            run_spin_echo_simulation(lin_grad=lin_grad,
+                                     quad_grad=0*ppm/cm**2,
+                                     N_cells=1000,
+                                     N_ensamble=100,
+                                     noise_scale=0.2*uV,
+                                     seed=1,
+                                     **kwargs)
+        except:
+            continue
