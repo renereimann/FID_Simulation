@@ -70,7 +70,7 @@ class PhaseFitFID(object):
         self.t_range = self.get_fit_range()
 
         self.res = self.chi2_fit()
-        print(self.res.fun, np.sum(np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range))))
+        self.n_point_in_fit = np.sum(np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range)))
         self.frequency = self.res.x[1]/self.width
         self.phi0 = self.res.x[0]
 
