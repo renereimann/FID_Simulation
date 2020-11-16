@@ -22,10 +22,10 @@ class HilbertTransform(object):
         phi = np.arctan(self.imag()/self.real())
         oscillations = np.cumsum(np.pi*(np.sign(self.flux[1:]) != np.sign(self.flux[:-1])))
         phi += np.concatenate([[0], oscillations])
-        return self.time, phi
+        return self.time*ms, phi
 
     def EnvelopeFunction(self):
-        return self.time, np.sqrt(self.imag()**2 + self.real()**2)
+        return self.time*ms, np.sqrt(self.imag()**2 + self.real()**2)*uV
 
     def plot_phase_function(self, fig=None):
         if fig is None:
