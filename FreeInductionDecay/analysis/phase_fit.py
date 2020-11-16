@@ -80,7 +80,7 @@ class PhaseFitFID(object):
         plt.plot(self.time/ms, self.phase_raw - self.phi0 - self.frequency*(self.time-self.t0), color="b", label="raw FID")
         if self.smoothing:
             plt.plot(self.time/ms, self.phase - self.phi0 - self.frequency*(self.time-self.t0), color="red", label="smoothed FID")
-            plt.errorbar(self.time/ms, self.phase - self.phi0 - self.frequency*(self.time-self.t0), yerr=self.noise/self.env, color="red", label="smoothed FID")
+            #plt.errorbar(self.time/ms, self.phase - self.phi0 - self.frequency*(self.time-self.t0), yerr=self.noise/self.env, color="red", label="smoothed FID")
         #plt.plot(time[mask]/ms, phi_fit[mask] - phi0 - frequency*(time[mask]-t0), color="k", ls="--", label="fit")
         phase_fit = self.fit_func((self.time-self.t0)/self.width, self.res.x)
         plt.plot(self.time/ms, phase_fit - self.phi0 - self.frequency*(self.time-self.t0), color="k", ls="--", label="fit")
