@@ -15,8 +15,8 @@ class ZeroCrossing(object):
         if len(times) != len(flux):
             raise AttributeError("times and flux must have the same dimension")
         self.N = len(flux)
-        self.time = times / ms
-        self.flux = flux / uV
+        self.time = times
+        self.flux = flux
 
     def linear_intersect(self, x1, y1, x2, y2, y=0):
         return (y - y1)/self.derivative(x1, y1, x2, y2) + x1
