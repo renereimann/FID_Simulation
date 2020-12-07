@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1000, N_ensamble=100, noise_scale=0.2*pc, seed=1, plotting=True, **kwargs):
+def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1000, N_ensamble=100, noise_scale=0.2*pc, seed=1, plotting=True, save_waveforms=True, **kwargs):
     # setup simulation
     b_field = StorageRingMagnet( )
     B0 = b_field.An[2]
@@ -116,14 +116,19 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
 
     ensemble_FID = []
     ensemble_Echo = []
+    ensamble_waveform = []
     for i in range(N_ensamble):
         N = noise(time_echo)
+        if save_waveforms:
+            ensamble_waveform.append(flux_echo+N)
+            
         freq_FID = FID_analysis(time_echo, flux_echo+N,
                             fit_window_fact=f_FID, **kwargs)
         freq_echo = Echo_analysis(time_echo, flux_echo+N,
                              fit_window_fact=f_Echo, **kwargs)
         ensemble_FID.append(freq_FID/kHz)
         ensemble_Echo.append(freq_echo/kHz)
+    np.save("./data/SpinEcho/waveforms_%s.npy"%grad_str, np.array(ensambe_waveform)/uV)
 
     bias_FID = np.mean(ensemble_FID)-true_f
     unce_FID = np.std(ensemble_FID)
