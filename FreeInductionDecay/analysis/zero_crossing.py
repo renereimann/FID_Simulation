@@ -58,7 +58,7 @@ class ZeroCrossing(object):
             yb = (2*t[i] - t[i-1] - t[i+1]) / (1/k[i-1] + 1/k[i+1]-2/k[i])
             baseline.append(yb)
         self.baseline = np.array(baseline)
-        base_spline = UnivariateSpline([np.isfinite(baseline)], self.baseline[np.isfinite(baseline)], k=1, s=0, ext=1)
+        base_spline = UnivariateSpline(t[1:-1][np.isfinite(baseline)], self.baseline[np.isfinite(baseline)], k=1, s=0, ext=1)
         return base_spline
 
     def get_asymmetry(self, return_pos_neg=False):
