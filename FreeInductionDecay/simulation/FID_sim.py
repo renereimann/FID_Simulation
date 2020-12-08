@@ -45,7 +45,7 @@ class UnitVectorArray(object):
     def set_x_y_z(self, x, y, z):
         norm = np.sqrt(x**2+y**2+z**2)
         self._x = x/norm
-        self._y = y/norm
+        self._y = y/norm  
         self._z = z/norm
 
     def set_L_T_phase(self, L, T, phase):

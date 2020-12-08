@@ -24,32 +24,41 @@ class ZeroCrossing(object):
     def derivative(self, x1, y1, x2, y2):
         return (y2-y1)/(x2-x1)
 
-    def PhaseFunction(self, return_derivative=False):
+    def PhaseFunction(self):
         zero_crossings = []
         derivatives = []
+        # sign can be -1, 0 or 1
         sign = np.sign(self.flux)
         for i in range(len(self.flux)-1):
-            if sign[i] != sign[i+1]:
+            # if sign is 0, we have hit the zero exactly --> use this time as zero crossing
+            # slope from previous and next datapoint
+            if sign[i] == 0:
+                k = self.derivative(self.time[i-1], self.flux[i-1],
+                                    self.time[i+1], self.flux[i+1])
+                zero_crossings.append(self.time[i])
+                derivatives.append(k)
+            elif sign[i] == -sign[i+1]:
                 t0 = self.linear_intersect(self.time[i], self.flux[i],
                                       self.time[i+1], self.flux[i+1])
                 k = self.derivative(self.time[i], self.flux[i],
                                     self.time[i+1], self.flux[i+1])
                 zero_crossings.append(t0)
                 derivatives.append(k)
-        zero_crossings = np.array(zero_crossings)
-        n = np.arange(len(zero_crossings))
-        phi = (n+0.5)*np.pi
-        if return_derivative:
-            return zero_crossings, phi, derivatives
-        return zero_crossings, phi
+        self.zero_crossings = np.array(zero_crossings)
+        self.derivatives = np.array(derivatives)
+        self.phi = (np.arange(len(self.zero_crossings))+0.5)*np.pi
+        return self.zero_crossings, self.phi
 
     def baseline_spline(self):
-        t, phi, k = self.PhaseFunction(return_derivative=True)
+        self.PhaseFunction()
+        t = self.zero_crossings
+        k = self.derivatives
         baseline = []
         for i in range(1, len(t)-1):
             yb = (2*t[i] - t[i-1] - t[i+1]) / (1/k[i-1] + 1/k[i+1]-2/k[i])
             baseline.append(yb)
-        base_spline = UnivariateSpline(t[1:-1], baseline, k=1, s=0)
+        self.baseline = np.array(baseline)
+        base_spline = UnivariateSpline([np.isfinite(baseline)], self.baseline[np.isfinite(baseline)], k=1, s=0, ext=1)
         return base_spline
 
     def get_asymmetry(self, return_pos_neg=False):
