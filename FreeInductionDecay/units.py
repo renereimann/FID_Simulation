@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 from numericalunits import µ0, NA, kB, hbar
 from numericalunits import mm, cm, m
