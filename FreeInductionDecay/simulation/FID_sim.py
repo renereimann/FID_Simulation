@@ -45,7 +45,7 @@ class UnitVectorArray(object):
     def set_x_y_z(self, x, y, z):
         norm = np.sqrt(x**2+y**2+z**2)
         self._x = x/norm
-        self._y = y/norm  
+        self._y = y/norm
         self._z = z/norm
 
     def set_L_T_phase(self, L, T, phase):
@@ -246,8 +246,8 @@ class FID_simulation(object):
             weight_x = self.cells_B1_x/np.mean(self.cells_B1)
             weight_z = self.cells_B1_z/np.mean(self.cells_B1)
             B_x_dmu_dt = self.cells_mu.T[:, None]*magnitude[:, None]*(weight_x[:, None]*np.cos(argument) + weight_z[:, None]*np.sin(argument))*(np.exp(-this_t/self.probe.material.T2)[:, None]).T
-            #return self.coil.turns * µ0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
-            flux.append(self.probe.coil.turns * µ0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
+            #return self.coil.turns * mu0 * np.sum(B_x_dmu_dt/self.cells_B1[:, None]*self.cells_magnetization[:, None], axis=0) * np.pi * self.coil.radius**2
+            flux.append(self.probe.coil.turns * mu0 * np.sum(B_x_dmu_dt*self.cells_magnetization[:, None], axis=0) * np.pi * self.probe.coil.radius**2)
             t0 += this_t[-1]
             self.cells_mu.set_L_T_phase(self.cells_mu.L,
                                         self.cells_mu.T * np.exp(-this_t[-1]/self.probe.material.T2),
@@ -319,9 +319,9 @@ class FID_simulation(object):
             By = self.cells_B0_y
             Bz = self.cells_B0_z
             if with_self_contribution:
-                Bx = Bx + µ0*self.cells_magnetization*Mx
-                By = By + µ0*self.cells_magnetization*My
-                Bz = Bz + µ0*self.cells_magnetization*Mz
+                Bx = Bx + mu0*self.cells_magnetization*Mx
+                By = By + mu0*self.cells_magnetization*My
+                Bz = Bz + mu0*self.cells_magnetization*Mz
             if omega_rf is not None:
                 rf_osci = np.sin(omega_rf*t+phase_offset)
                 Bx = Bx + rf_osci * self.cells_B1_x
