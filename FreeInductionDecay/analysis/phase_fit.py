@@ -67,7 +67,7 @@ class PhaseFitFID(object):
         self.noise = self.get_noise()
         self.t_range = self.get_fit_range()
         mask = np.logical_and(self.t_range[0] < self.time, self.time < self.t_range[1])
-        self.f_estimate, _, _, _, _ = linregress(self.time[mask], self.phase_raw[mask])
+        self.f_estimate, self.offset_estimate, _, _, _ = linregress(self.time[mask], self.phase_raw[mask])
         if self.smoothing:
             self.window_size = 2*np.pi/self.f_estimate
             self.phase = self.apply_smoothing()
