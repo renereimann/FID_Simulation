@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import linregress
 from scipy.ndimage.filters import uniform_filter1d
 from ..units import *
 from .hilbert_transform import HilbertTransform
@@ -53,7 +54,7 @@ class PhaseFitFID(object):
         self.width = (self.t_range[1]-self.t_range[0])/self.fit_window_fact
         chi2 = lambda p: np.sum((self.fit_func((self.time[mask]-self.t0)/self.width, p) - self.phase[mask])**2*(self.env[mask]/self.noise)**2)
         x0 = np.random.normal(scale=0.1, size=5)
-        x0[1] += 314
+        x0[1] += self.f_estimate*self.width
         res = minimize(chi2, x0, tol=self.tol, method="L-BFGS-B")
         return res
 
@@ -64,11 +65,14 @@ class PhaseFitFID(object):
         _, self.env =  hilbert.EnvelopeFunction()
         _, self.phase_raw =  hilbert.PhaseFunction()
         self.noise = self.get_noise()
+        self.t_range = self.get_fit_range()
+        mask = np.logical_and(self.t_range[0] < self.time, self.time < self.t_range[1])
+        self.f_estimate, _, _, _, _ = linregress(self.time[mask], self.phase_raw[mask])
         if self.smoothing:
+            self.window_size = 2*np.pi/self.f_estimate
             self.phase = self.apply_smoothing()
         else:
             self.phase = self.phase_raw[:]
-        self.t_range = self.get_fit_range()
 
         self.res = self.chi2_fit()
         self.n_point_in_fit = np.sum(np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range)))
