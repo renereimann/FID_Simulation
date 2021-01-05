@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from ..units import *
 from .probe import NMRProbe
 from .coil import Coil
