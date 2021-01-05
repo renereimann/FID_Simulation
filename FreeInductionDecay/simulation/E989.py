@@ -18,7 +18,7 @@ class FixedProbe(NMRProbe):
                               length=15.0*mm,
                               diameter=4.6*mm,
                               current=0.7*A)
-        super().__init__(length = 33.5*mm,
+        super(FixedProbe, self).__init__(length = 33.5*mm,
                          diameter = 2.5*mm,
                          material = PetroleumJelly,
                          temp = (273.15 + 26.85) * K,
@@ -37,7 +37,7 @@ class TrolleyProbe(NMRProbe):
                               diameter=4.6*mm,
                               current=0.7*A)
 
-        super().__init__(length = 33.5*mm,
+        super(TrolleyProbe, self).__init__(length = 33.5*mm,
                          diameter = 2.5*mm,
                          material = PetroleumJelly,
                          temp = (273.15 + 26.85) * K,
@@ -60,7 +60,7 @@ class PlungingProbe(NMRProbe):
                               diameter=15.065*mm+(0.97*mm/2),
                               current=0.7*A)
 
-        super().__init__(length = 228.6*mm,
+        super(PlungingProbe, self).__init__(length = 228.6*mm,
                          diameter = 4.2065*mm,
                          material = PP_Water,
                          temp = (273.15 + 26.85) * K,
@@ -69,4 +69,4 @@ class PlungingProbe(NMRProbe):
 
 class StorageRingMagnet(RingMagnet):
     def __init__(self, B0=1.45*T):
-        super().__init__(B0)
+        super(StorageRingMagnet, self).__init__(B0)
