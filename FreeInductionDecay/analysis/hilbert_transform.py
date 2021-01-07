@@ -20,7 +20,7 @@ class HilbertTransform(object):
 
     def PhaseFunction(self):
         phi = np.arctan(self.imag()/self.real())
-        jump = np.pi*np.logical_and(phi_new[:-1] > 0, phi_new[1:] < 0)
+        jump = np.pi*np.logical_and(phi[:-1] > 0, phi[1:] < 0)
         phi += np.concatenate([[0], np.cumsum(jump)])
         return self.time*ms, phi
 
