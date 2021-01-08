@@ -16,7 +16,6 @@ class PhaseFitFID(object):
         self.frac = frac
         self.smoothing = smoothing
         self.tol = tol
-        self.fit_window_fact = 1
 
     def get_fit_range(self):
         t_min = np.min(self.time)
@@ -50,7 +49,7 @@ class PhaseFitFID(object):
 
     def chi2_fit(self):
         mask = np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range))
-        self.width = (self.t_range[1]-self.t_range[0])/self.fit_window_fact
+        self.width = (self.t_range[1]-self.t_range[0])
         chi2 = lambda p: np.sum((self.fit_func((self.time[mask]-self.t0)/self.width, p) - self.phase[mask])**2*(self.env[mask]/self.noise)**2)
         x0 = np.random.normal(scale=0.1, size=5)
         x0[0] += self.offset_estimate
@@ -108,7 +107,6 @@ class PhaseFitEcho(PhaseFitFID):
         self.frac = frac
         self.smoothing = True
         self.tol = tol
-        self.fit_window_fact = 1
 
     def fit_func(self, t, p):
         # the phase function needs also even components
