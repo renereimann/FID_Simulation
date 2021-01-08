@@ -27,7 +27,7 @@ class FixedProbe(NMRProbe):
 class TrolleyProbe(NMRProbe):
     def __init__(self):
         self.readout_length = 16*ms
-        self.sampling_rate_online = 62/61.74e6
+        self.sampling_rate_online = 61.74*MHz/62
         self.sampling_rate_offline = self.sampling_rate_online
         self.time_pretrigger = 0.3*ms
         self.mix_down = 61.74*MHz
