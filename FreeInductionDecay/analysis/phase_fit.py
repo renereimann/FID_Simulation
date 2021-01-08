@@ -8,13 +8,12 @@ from .hilbert_transform import HilbertTransform
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=0.7, smoothing=True, window_size=1/(50*kHz), tol=1e-5):
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
         self.edge_ignore = edge_ignore
         self.frac = frac
-        self.window_size = window_size
         self.smoothing = smoothing
         self.tol = tol
         self.fit_window_fact = 1
@@ -102,12 +101,11 @@ class PhaseFitFID(object):
         plt.xlim(xmin=self.t0/ms*0.95)
 
 class PhaseFitEcho(PhaseFitFID):
-    def __init__(self, frac=0.7, probe=None, smoothing=True, window_size=1/(50*kHz), tol=1e-5):
+    def __init__(self, frac=np.exp(-1), probe=None, smoothing=True, tol=1e-5):
         self.t0 = 2*probe.readout_length-probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
         self.frac = frac
-        self.window_size = window_size
         self.smoothing = True
         self.tol = tol
         self.fit_window_fact = 1
