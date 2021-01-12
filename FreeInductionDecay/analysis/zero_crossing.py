@@ -2,8 +2,6 @@
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
-from ..units import uV, ms
-
 # David Flay has implemented that in a recursive / iterative procedure (including)
 # baseliine correction (up to a precision of 1e-16 s)
 # See Field Paper Sec. II B 2
