@@ -8,7 +8,7 @@ from .hilbert_transform import HilbertTransform
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5):
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
@@ -16,6 +16,7 @@ class PhaseFitFID(object):
         self.frac = frac
         self.smoothing = smoothing
         self.tol = tol
+        self.n_smooth = n_smooth
 
     def get_fit_range(self):
         t_min = np.min(self.time)
@@ -68,7 +69,7 @@ class PhaseFitFID(object):
         mask = np.logical_and(self.t_range[0] < self.time, self.time < self.t_range[1])
         self.f_estimate, self.offset_estimate, _, _, _ = linregress(self.time[mask], self.phase_raw[mask])
         if self.smoothing:
-            self.window_size = 2*np.pi/self.f_estimate
+            self.window_size = self.n_smooth*2*np.pi/self.f_estimate
             self.phase = self.apply_smoothing()
         else:
             self.phase = self.phase_raw[:]
@@ -100,13 +101,14 @@ class PhaseFitFID(object):
         plt.xlim(xmin=self.t0/ms*0.95)
 
 class PhaseFitEcho(PhaseFitFID):
-    def __init__(self, frac=np.exp(-1), probe=None, smoothing=True, tol=1e-5):
+    def __init__(self, frac=np.exp(-1), probe=None, smoothing=True, tol=1e-5, n_smooth=3):
         self.t0 = 2*probe.readout_length-probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
         self.frac = frac
         self.smoothing = True
         self.tol = tol
+        self.n_smooth = n_smooth
 
     def fit_func(self, t, p):
         # the phase function needs also even components
