@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1000, N_ensamble=100, noise_scale=0.2*pc, seed=1, plotting=True, fit_window_scan=True, base_dir="./plots/Bloch_Echo", save_waveforms=True, **kwargs):
+def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1000, N_ensamble=100, noise_scale=0.2*pc, seed=1, plotting=True, base_dir="./plots/Bloch_Echo", save_waveforms=True, **kwargs):
     # setup simulation
     b_field = StorageRingMagnet( )
     B0 = b_field.An[2]
@@ -82,37 +82,8 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
         plt.ylabel("phase in rad")
         plt.savefig("%s/Phase_function_%s.png"%(base_dir, grad_str), dpi=200)
 
-    fit_fid = PhaseFitFID(**{"frac": 0.7, "tol": 1e-5, "window_size": 1/(50*kHz), "smoothing": True, "probe": sim.probe, "edge_ignore": 60*us})
-    fit_echo = PhaseFitEcho(**{"frac": 0.7, "tol": 1e-5, "window_size": 1/(50*kHz), "smoothing": True, "probe": sim.probe})
-
-    if fit_window_scan: # fit_window_scan
-        f_scan = np.logspace(-0.5, 0.7, 20)
-        fid_scatter = []
-        for fit_window_fact in f_scan:
-            fit_fid.fit_window_fact = fit_window_fact
-            ensemble_FID = [fit_fid.fit(time, flux)/kHz for i in range(N_ensamble)]
-            fid_scatter.append(np.std(ensemble_FID))
-        echo_scatter = []
-        for fit_window_fact in f_scan:
-            fit_echo.fit_window_fact = fit_window_fact
-            ensemble_Echo = [fit_echo.fit(time, flux)/kHz for i in range(N_ensamble)]
-            echo_scatter.append(np.std(ensemble_Echo))
-
-        fit_fid.fit_window_fact = f_scan[np.argmin(fid_scatter)]
-        fit_echo.fit_window_fact = f_scan[np.argmin(echo_scatter)]
-
-        if plotting:
-            plt.figure()
-            plt.plot(f_scan, 1e3*np.array(fid_scatter), label="FID", color="blue")
-            plt.plot(f_scan, 1e3*np.array(echo_scatter), label="Echo", color="red")
-            plt.axvline(fit_fid.fit_window_fact, color="blue")
-            plt.axvline(fit_echo.fit_window_fact, color="red")
-            plt.legend()
-            plt.loglog()
-            plt.grid()
-            plt.xlabel("fit window factor")
-            plt.ylabel("fitter convergence / Hz")
-            plt.savefig("%s/fitter_accurancy_%s.png"%(base_dir, grad_str), dpi=200)
+    fit_fid = PhaseFitFID(**{"frac": np.exp(-1), "tol": 1e-5, "smoothing": True, "probe": sim.probe, "edge_ignore": 60*us})
+    fit_echo = PhaseFitEcho(**{"frac": np.exp(-1), "tol": 1e-5, "smoothing": True, "probe": sim.probe})
 
     true_f = sim.mean_frequency()/kHz
     # extraction plot
@@ -134,10 +105,12 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
     for i in range(N_ensamble):
         N = noise(time)
         if save_waveforms:
-            ensamble_waveform.append(flux_echo+N)
+            ensamble_waveform.append(flux_raw+N)
         ensemble_FID.append(fit_fid.fit(time, flux_raw+N)/kHz)
         ensemble_Echo.append(fit_echo.fit(time, flux_raw+N)/kHz)
-    np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensambe_waveform)/uV)
+    if save_waveforms:
+        print("%s/waveforms_%s.npy"%(base_dir, grad_str))
+        np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensamble_waveform)/uV)
 
     bias_FID = np.mean(ensemble_FID)-true_f
     unce_FID = np.std(ensemble_FID)
@@ -151,15 +124,13 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
     t_range_fid = fit_fid.t_range
 
     # save data
-    res={"FID": {"f": fit_fid.fit_window_fact,
-                 "t_range": (t_range_fid[0]/ms, t_range_fid[1]/ms),
+    res={"FID": {"t_range": (t_range_fid[0]/ms, t_range_fid[1]/ms),
                  "t_range_unit": "ms",
                  "bias": bias_FID,
                  "bias_unit": "kHz",
                  "uncertenty": unce_FID,
                  "uncertenty_unit": "kHz"},
-         "Echo": {"f": fit_echo.fit_window_fact,
-                  "t_range": (t_range_echo[0]/ms, t_range_echo[1]/ms),
+         "Echo": {"t_range": (t_range_echo[0]/ms, t_range_echo[1]/ms),
                   "t_range_unit": "ms",
                   "bias": bias_Echo,
                   "bias_unit": "kHz",
@@ -169,7 +140,7 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
         pickle.dump(res, open_file)
 
 if __name__=="__main__":
-    for lin_grad in np.linspace(0, 40, 20+1)*ppm/cm:
+    for lin_grad in np.arange(0, 40+2, 2)*ppm/cm:
         try:
             run_spin_echo_simulation(lin_grad=lin_grad,
                                      quad_grad=0*ppm/cm**2,
@@ -177,9 +148,8 @@ if __name__=="__main__":
                                      N_ensamble=100,
                                      noise_scale=0.2*pc,
                                      seed=1,
-                                     frac=0.7,
+                                     frac=np.exp(-1),
                                      tol=1e-5,
-                                     window_size=1/(50*kHz),
                                      smoothing=True,
                                      edge_ignore=60*us)
         except:
