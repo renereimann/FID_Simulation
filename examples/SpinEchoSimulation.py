@@ -105,10 +105,12 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
     for i in range(N_ensamble):
         N = noise(time)
         if save_waveforms:
-            ensamble_waveform.append(flux_echo+N)
+            ensamble_waveform.append(flux_raw+N)
         ensemble_FID.append(fit_fid.fit(time, flux_raw+N)/kHz)
         ensemble_Echo.append(fit_echo.fit(time, flux_raw+N)/kHz)
-    np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensambe_waveform)/uV)
+    if save_waveforms:
+        print("%s/waveforms_%s.npy"%(base_dir, grad_str))
+        np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensambe_waveform)/uV)
 
     bias_FID = np.mean(ensemble_FID)-true_f
     unce_FID = np.std(ensemble_FID)
@@ -138,7 +140,7 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
         pickle.dump(res, open_file)
 
 if __name__=="__main__":
-    for lin_grad in np.linspace(0, 40, 20+1)*ppm/cm:
+    for lin_grad in np.arange(0, 40+2, 2)*ppm/cm:
         try:
             run_spin_echo_simulation(lin_grad=lin_grad,
                                      quad_grad=0*ppm/cm**2,
@@ -146,7 +148,9 @@ if __name__=="__main__":
                                      N_ensamble=100,
                                      noise_scale=0.2*pc,
                                      seed=1,
+                                     frac=np.exp(-1),
                                      tol=1e-5,
+                                     base_dir="./plots/",
                                      smoothing=True,
                                      edge_ignore=60*us)
         except:
