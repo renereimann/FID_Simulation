@@ -1,4 +1,6 @@
-from numericalunits import µ0, NA, kB, hbar
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+from numericalunits import mu0, NA, kB, hbar
 from numericalunits import mm, cm, m
 from numericalunits import ns, us, ms, s, Hz, kHz, MHz
 from numericalunits import uT, mT, T

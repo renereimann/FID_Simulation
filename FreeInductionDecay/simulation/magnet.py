@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from ..units import *
 
 class RingMagnet(object):

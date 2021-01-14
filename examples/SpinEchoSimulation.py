@@ -150,6 +150,7 @@ if __name__=="__main__":
                                      seed=1,
                                      frac=np.exp(-1),
                                      tol=1e-5,
+                                     base_dir="./plots/",
                                      smoothing=True,
                                      edge_ignore=60*us)
         except:

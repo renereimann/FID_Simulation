@@ -10,7 +10,7 @@ from this repository in a single folder.
 Dependencies:
 * numpy
 * scipy (subpackages: fft and integrate)
-* numericalunits
+* numericalunits (<= numericalunits-1.23 if used with python2)
 
 # Documentation
 

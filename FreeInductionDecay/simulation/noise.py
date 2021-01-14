@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 try:
     import scipy.fft as fftpack

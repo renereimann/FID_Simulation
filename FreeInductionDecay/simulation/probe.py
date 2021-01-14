@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # This script simulates the FID signal of a pNMR probe.
 #
 # Author: René Reimann (2020)

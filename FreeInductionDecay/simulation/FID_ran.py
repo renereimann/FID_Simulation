@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 From Ran's "MUON G-2 NMR FREQUENCY EXTRACTION" Sec. 5.2
 

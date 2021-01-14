@@ -1,21 +1,22 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import linregress
 from scipy.ndimage.filters import uniform_filter1d
 from ..units import *
 from .hilbert_transform import HilbertTransform
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=0.7, smoothing=True, window_size=1/(50*kHz), tol=1e-5):
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
         self.edge_ignore = edge_ignore
         self.frac = frac
-        self.window_size = window_size
         self.smoothing = smoothing
         self.tol = tol
-        self.fit_window_fact = 1
+        self.n_smooth = n_smooth
 
     def get_fit_range(self):
         t_min = np.min(self.time)
@@ -49,10 +50,11 @@ class PhaseFitFID(object):
 
     def chi2_fit(self):
         mask = np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range))
-        self.width = (self.t_range[1]-self.t_range[0])/self.fit_window_fact
+        self.width = (self.t_range[1]-self.t_range[0])
         chi2 = lambda p: np.sum((self.fit_func((self.time[mask]-self.t0)/self.width, p) - self.phase[mask])**2*(self.env[mask]/self.noise)**2)
         x0 = np.random.normal(scale=0.1, size=5)
-        x0[1] += 314
+        x0[0] += self.offset_estimate
+        x0[1] += self.f_estimate*self.width
         res = minimize(chi2, x0, tol=self.tol, method="L-BFGS-B")
         return res
 
@@ -63,11 +65,14 @@ class PhaseFitFID(object):
         _, self.env =  hilbert.EnvelopeFunction()
         _, self.phase_raw =  hilbert.PhaseFunction()
         self.noise = self.get_noise()
+        self.t_range = self.get_fit_range()
+        mask = np.logical_and(self.t_range[0] < self.time, self.time < self.t_range[1])
+        self.f_estimate, self.offset_estimate, _, _, _ = linregress(self.time[mask], self.phase_raw[mask])
         if self.smoothing:
+            self.window_size = self.n_smooth*2*np.pi/self.f_estimate
             self.phase = self.apply_smoothing()
         else:
             self.phase = self.phase_raw[:]
-        self.t_range = self.get_fit_range()
 
         self.res = self.chi2_fit()
         self.n_point_in_fit = np.sum(np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range)))
@@ -96,15 +101,14 @@ class PhaseFitFID(object):
         plt.xlim(xmin=self.t0/ms*0.95)
 
 class PhaseFitEcho(PhaseFitFID):
-    def __init__(self, frac=0.7, probe=None, smoothing=True, window_size=1/(50*kHz), tol=1e-5):
+    def __init__(self, frac=np.exp(-1), probe=None, smoothing=True, tol=1e-5, n_smooth=3):
         self.t0 = 2*probe.readout_length-probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
         self.frac = frac
-        self.window_size = window_size
         self.smoothing = True
         self.tol = tol
-        self.fit_window_fact = 1
+        self.n_smooth = n_smooth
 
     def fit_func(self, t, p):
         # the phase function needs also even components

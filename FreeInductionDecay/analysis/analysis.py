@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from E989 import StorageRingMagnet, FixedProbe
 from noise import FreqNoise
 from units import *

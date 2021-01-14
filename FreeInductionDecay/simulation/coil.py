@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import numpy as np
 from scipy import integrate
 from ..units import *
@@ -55,9 +57,9 @@ class Coil(object):
         integrand_y = ( dlz * (x-lx) - dlx * (z-lz) ) / dist**3
         integrand_z = ( dlx * (y-ly) - dly * (x-lx) ) / dist**3
 
-        B_x = µ0/(4*np.pi) * self.current * integrate.simps(integrand_x, x=phi)
-        B_y = µ0/(4*np.pi) * self.current * integrate.simps(integrand_y, x=phi)
-        B_z = µ0/(4*np.pi) * self.current * integrate.simps(integrand_z, x=phi)
+        B_x = mu0/(4*np.pi) * self.current * integrate.simps(integrand_x, x=phi)
+        B_y = mu0/(4*np.pi) * self.current * integrate.simps(integrand_y, x=phi)
+        B_z = mu0/(4*np.pi) * self.current * integrate.simps(integrand_z, x=phi)
 
         return [B_x, B_y, B_z]
 
@@ -70,5 +72,5 @@ class Coil(object):
         I = self.current
         L = self.length
         R = self.coil.radius
-        B_z = lambda z: µ0*n*I/2*((z+L/2)/np.sqrt(R**2+(z+L/2)**2)-(z-L/2)/np.sqrt(R**2+(z-L/2)**2))
+        B_z = lambda z: mu0*n*I/2*((z+L/2)/np.sqrt(R**2+(z+L/2)**2)-(z-L/2)/np.sqrt(R**2+(z-L/2)**2))
         return B_z(z)
