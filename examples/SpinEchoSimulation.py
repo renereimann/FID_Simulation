@@ -110,7 +110,7 @@ def run_spin_echo_simulation(lin_grad=0*ppm/cm, quad_grad=0*ppm/cm**2, N_cells=1
         ensemble_Echo.append(fit_echo.fit(time, flux_raw+N)/kHz)
     if save_waveforms:
         print("%s/waveforms_%s.npy"%(base_dir, grad_str))
-        np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensambe_waveform)/uV)
+        np.save("%s/waveforms_%s.npy"%(base_dir, grad_str), np.array(ensamble_waveform)/uV)
 
     bias_FID = np.mean(ensemble_FID)-true_f
     unce_FID = np.std(ensemble_FID)
