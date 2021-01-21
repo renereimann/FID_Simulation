@@ -17,7 +17,7 @@ class Noise(object):
 
 class MixedNoise(Noise):
     def __init__(self, components=[], rng=None):
-        super().__init__(rng)
+        super(MixedNoise, self).__init__(rng)
         self.components = components
 
     def __call__(self, times, rng=None):
@@ -29,7 +29,7 @@ class MixedNoise(Noise):
 
 class WhiteNoise(Noise):
     def __init__(self, scale, rng=None):
-        super().__init__(rng)
+        super(WhiteNoise, self).__init__(rng)
         self.scale = scale
 
     def __call__(self, times, rng=None):
@@ -38,7 +38,7 @@ class WhiteNoise(Noise):
 
 class FreqNoise(Noise):
     def __init__(self, power, scale, rng=None):
-        super().__init__(rng)
+        super(FreqNoise, self).__init__(rng)
         self.power = power
         self.scale = scale
 
