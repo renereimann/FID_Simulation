@@ -15,9 +15,7 @@ class UnitVectorArray(object):
         phase = arctan2(z, x), which means +x axis 0 deg, +z axis 90 deg, -x axis 180 deg and -y axis 270 deg
     """
     def __init__(self, x, y, z):
-        self._x = x
-        self._y = y
-        self._z = z
+        self.set_x_y_z(x,y,z)
 
     @property
     def x(self):
