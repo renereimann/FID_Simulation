@@ -353,7 +353,7 @@ class FID_simulation(object):
             w = self.cells_B1/np.mean(self.cells_B1)
             history.append((rk_res.t, np.mean(w*Mx), np.mean(w*My), np.mean(w*Mz), Mx[central_cell], My[central_cell], Mz[central_cell]))
             rk_res.step()
-
+        M = rk_res.y.reshape((3, self.N_cells))
         self.cells_mu.set_x_y_z(M[0], M[1], M[2])
 
         return np.array(history, dtype=[(k, np.float) for k in ["time", "Mx_mean", "My_mean", "Mz_mean", "Mx_center", "My_center", "Mz_center"]])
