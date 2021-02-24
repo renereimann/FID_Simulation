@@ -115,28 +115,37 @@ class FID_simulation(object):
                                         self.cells_B0_y,
                                         self.cells_B0_z)
 
-    # rename rf pulse ideal
-    # that should not assume that we start in equalibrium,
-    # so make it work for pulse duration of any time and any starting magnetization
-    def apply_rf_field(self, time=None):
-        ###
-        ### angle of rotation axis: theta
-        ### tan(theta) = B_RF / DeltaB
-        ### DeltaB = - Omega/gamma
-        ### Omega = omega_0 + omega_rf
-        ### omega_0 = - gamma B0
-        ### --> tan(theta) = gamma B_RF / (gamma B_0 - omega_RF)
-        ###
-        ### angle by which to rotate: beta
-        ###
-        if time is None:
-            time = self.probe.estimate_rf_pulse()
+    def apply_rf_field(self, time=None, omega_rf=None, phase_rf=0):
 
-        # aproximation
-        L = np.cos(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        T = np.sin(self.probe.material.gyromagnetic_ratio*self.cells_B1/2.*time)
-        phase = np.arctan(1./(self.probe.material.T2*self.probe.material.gyromagnetic_ratio*self.cells_B0))
-        self.cells_mu.set_L_T_phase(L, T, phase)
+        t_pulse = self.probe.estimate_rf_pulse() if time is None else time
+        omega_rf = 2*np.pi*self.probe.rf_pulse_frequency if omega_rf is None else omega_rf
+        gamma_p = self.probe.material.gyromagnetic_ratio
+
+        # effective external field in co-rotating frame
+        deltaB = self.cells_B0-omega_rf/gamma_p
+        # the co-rotating component of the RF field is only half of the full amplitude
+        B1 = self.cells_B1/2
+        # tilt angle
+        tilt_ang = np.arcsin(B1/np.sqrt(B1*B1+deltaB*deltaB))
+        # effective lamor frequency
+        omega_eff = gamma_p*np.sqrt(B1*B1+deltaB*deltaB)
+        # flip angle
+        flip_ang = omega_eff*t_pulse
+        # rotation axis in co-rotating frame (assumes external field along y axis!!!)
+        ux, uy, uz = -np.sin(tilt_ang)*np.sin(phase_rf-np.pi/2), np.cos(tilt_ang), np.sin(tilt_ang)*np.cos(phase_rf-np.pi/2)
+        # rotation around rotation axis [ux,uy,uz] by angle `flip_ang`
+        # see https://en.wikipedia.org/wiki/Rotation_matrix#Rotation_matrix_from_axis_and_angle
+        cT = np.cos(flip_ang)
+        sT = np.sin(flip_ang)
+        wx = (cT+ux*ux*(1-cT))*self.cells_mu.x + (ux*uy*(1-cT)-uz*sT)*self.cells_mu.y + (ux*uz*(1-cT)+uy*sT)*self.cells_mu.z
+        wy = (uy*ux*(1-cT)+uz*sT)*self.cells_mu.x + (cT+uy*uy*(1-cT))*self.cells_mu.y + (uy*uz*(1-cT)-ux*sT)*self.cells_mu.z
+        wz = (uz*ux*(1-cT)-uy*sT)*self.cells_mu.x + (uz*uy*(1-cT)+ux*sT)*self.cells_mu.y + (cT+uz*uz*(1-cT))*self.cells_mu.z
+        # move from co-rotating frame to lab frame
+        vx = np.cos(omega_rf*t_pulse)*wx - np.sin(omega_rf*t_pulse)*wz
+        vy = wy
+        vz = np.sin(omega_rf*t_pulse)*wx + np.cos(omega_rf*t_pulse)*wz
+        # set final state in simulation
+        self.cells_mu.set_x_y_z(vx, vy, vz)
 
     def spin_echo(self, time_pi=None, pretrigger=False, useBloch=True, pi_2_pulse_length=None, **kwargs):
         if time_pi is None:
@@ -150,7 +159,7 @@ class FID_simulation(object):
             self.solve_bloch_eq_nummerical(time=pi_2_pulse_length,
                                            omega_rf=2*np.pi*self.probe.rf_pulse_frequency)
         else:
-            self.apply_rf_field()
+            self.apply_rf_field(time=pi_2_pulse_length)
 
         # FID
         flux1, time1 = self.generate_FID(pretrigger=pretrigger, **kwargs)
@@ -160,7 +169,7 @@ class FID_simulation(object):
             self.solve_bloch_eq_nummerical(time=2*pi_2_pulse_length,
                                            omega_rf=2*np.pi*self.probe.rf_pulse_frequency)
         else:
-            self.cells_phase0 *= -1
+            self.apply_rf_field(time=2*pi_2_pulse_length)
 
         # spin echo
         t = np.arange(0, 2*time_pi, 1/self.probe.sampling_rate_offline)
