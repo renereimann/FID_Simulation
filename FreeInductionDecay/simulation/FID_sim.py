@@ -263,7 +263,7 @@ class FID_simulation(object):
         return flux, t
 
     # rename bloch equation
-    def solve_bloch_eq_nummerical(self, time=None, initial_condition=None, omega_rf=2*np.pi*61.79*MHz, with_relaxation=False, time_step=1.*ns, with_self_contribution=True, phase_offset=0):
+    def solve_bloch_eq_nummerical(self, time=None, initial_condition=None, omega_rf=2*np.pi*61.79*MHz, with_relaxation=False, time_step=1.*ns, with_self_contribution=True, phase_rf=0):
         (r"""Solves the Bloch Equation numerically for a RF pulse with length `time`
         and frequency `omega_rf`.
 
@@ -322,7 +322,7 @@ class FID_simulation(object):
                 By = By + mu0*self.cells_magnetization*My
                 Bz = Bz + mu0*self.cells_magnetization*Mz
             if omega_rf is not None:
-                rf_osci = np.sin(omega_rf*t+phase_offset)
+                rf_osci = np.sin(omega_rf*t+phase_rf)
                 Bx = Bx + rf_osci * self.cells_B1_x
                 By = By + rf_osci * self.cells_B1_y
                 Bz = Bz + rf_osci * self.cells_B1_z
