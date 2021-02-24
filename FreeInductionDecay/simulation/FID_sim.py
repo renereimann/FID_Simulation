@@ -132,7 +132,7 @@ class FID_simulation(object):
         # flip angle
         flip_ang = omega_eff*t_pulse
         # rotation axis in co-rotating frame (assumes external field along y axis!!!)
-        ux, uy, uz = -np.sin(tilt_ang)*np.sin(phase_rf-np.pi/2), np.cos(tilt_ang), np.sin(tilt_ang)*np.cos(phase_rf-np.pi/2)
+        ux, uy, uz = np.sin(tilt_ang)*np.cos(phase_rf), np.cos(tilt_ang), np.sin(tilt_ang)*np.sin(phase_rf)
         # rotation around rotation axis [ux,uy,uz] by angle `flip_ang`
         # see https://en.wikipedia.org/wiki/Rotation_matrix#Rotation_matrix_from_axis_and_angle
         cT = np.cos(flip_ang)
