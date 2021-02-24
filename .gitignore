@@ -132,3 +132,6 @@ dmypy.json
 plots/
 data/
 JupyterNotebooks/
+
+FreeInductionDecay.egg-info
+*.root
