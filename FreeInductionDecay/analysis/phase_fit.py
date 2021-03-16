@@ -9,7 +9,13 @@ import json
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None, fit_range_template_file=None):
+    fit_version = {"t3_odd": {"nParams": 3, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3},
+                   "t5_odd": {"nParams": 4, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3 + p[3]*t**5},
+                   "t7_odd": {"nParams": 5, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3 + p[3]*t**5 + p[4]*t**7},
+                   "t4_all": {"nParams": 5, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4},
+                   "t7_all": {"nParams": 8, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4+ p[5]*t**5 + p[6]*t**6 + p[7]*t**7},
+                   }
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None, fit_range_template_file=None, fit_mode="t5_odd"):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
@@ -18,6 +24,8 @@ class PhaseFitFID(object):
         self.smoothing = smoothing
         self.tol = tol
         self.n_smooth = n_smooth
+        self.nParams = self.fit_version[fit_mode]["nParams"]
+        self.fit_func = self.fit_version[fit_mode]["func"]
         if phase_template_file is not None:
             self.load_phase_template(phase_template_file)
         if fit_range_template_file is not None:
@@ -53,10 +61,6 @@ class PhaseFitFID(object):
         t_max = np.min(self.time[np.logical_and(self.time > t_min, np.logical_not(mask))])
         return np.array([t_min, t_max])
 
-    def fit_func(self, t, p):
-        return p[0] + p[1]*t + p[2]*t**3 + p[3]*t**5 + p[4]*t**7
-        #return p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4+ p[5]*t**5 + p[6]*t**6 + p[7]*t**7
-
     def apply_smoothing(self):
         N = int(self.window_size/np.diff(self.time)[0])
         if N%2 == 0:
@@ -70,7 +74,7 @@ class PhaseFitFID(object):
         mask = np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range))
         self.width = (self.t_range[1]-self.t_range[0])
         chi2 = lambda p: np.sum((self.fit_func((self.time[mask]-self.t0)/self.width, p) - self.phase[mask])**2*(self.env[mask]/self.noise)**2)
-        x0 = np.random.normal(scale=0.1, size=5)
+        x0 = np.random.normal(scale=0.1, size=self.nParams)
         x0[0] = self.offset_estimate*(1+x0[0])
         x0[1] = self.f_estimate*self.width*(1+x0[1])
         res = minimize(chi2, x0, tol=self.tol, method="L-BFGS-B")
@@ -130,10 +134,6 @@ class PhaseFitEcho(PhaseFitFID):
         self.smoothing = True
         self.tol = tol
         self.n_smooth = n_smooth
-
-    def fit_func(self, t, p):
-        # the phase function needs also even components
-        return p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4
 
     def get_fit_range(self):
         # closest index to t0
