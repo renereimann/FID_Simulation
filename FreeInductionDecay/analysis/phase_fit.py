@@ -5,10 +5,11 @@ from scipy.stats import linregress
 from scipy.ndimage.filters import uniform_filter1d
 from ..units import *
 from .hilbert_transform import HilbertTransform
+import json
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None):
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None, fit_range_template_file=None):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
@@ -18,15 +19,22 @@ class PhaseFitFID(object):
         self.tol = tol
         self.n_smooth = n_smooth
         if phase_template_file is not None:
-            self.load_template(phase_template_file)
+            self.load_phase_template(phase_template_file)
+        if fit_range_template_file is not None:
+            self.load_fit_range_template(fit_range_template_file)
 
-    def load_template(self, path):
+    def load_phase_template(self, path):
         if path.endswith(".root"):
             import ROOT
             file = ROOT.TFile.Open(path,"READ")
             self.phase_template = np.reshape(file.Get("PhaseTemplate"), (-1, 4096))
         else:
             self.phase_template = np.genfromtxt(path, delimiter=",")
+
+    def load_fit_range_template(self, path):
+        with open(path, "r") as open_file:
+            raw_data = json.load(open_file)
+        self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
     def get_fit_range(self):
         t_min = np.min(self.time)
