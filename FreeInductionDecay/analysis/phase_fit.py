@@ -9,12 +9,16 @@ import json
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    fit_version = {"t3_odd": {"nParams": 3, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3},
-                   "t5_odd": {"nParams": 4, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3 + p[3]*t**5},
-                   "t7_odd": {"nParams": 5, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**3 + p[3]*t**5 + p[4]*t**7},
+    fit_version = {"t3_odd": {"nParams": 3, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3},
+                   "t5_odd": {"nParams": 4, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3             + p[3]*t**5},
+                   "t7_odd": {"nParams": 5, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3             + p[3]*t**5             + p[4]*t**7},
+                   "t3_all": {"nParams": 4, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3},
                    "t4_all": {"nParams": 5, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4},
-                   "t7_all": {"nParams": 8, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4+ p[5]*t**5 + p[6]*t**6 + p[7]*t**7},
+                   "t5_all": {"nParams": 6, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4 + p[5]*t**5},
+                   "t6_all": {"nParams": 7, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4 + p[5]*t**5 + p[6]*t**6},
+                   "t7_all": {"nParams": 8, "func": lambda t, p: p[0] + p[1]*t + p[2]*t**2 + p[3]*t**3 + p[4]*t**4 + p[5]*t**5 + p[6]*t**6 + p[7]*t**7},
                    }
+
     def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None, fit_range_template_file=None, fit_mode="t5_odd"):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
