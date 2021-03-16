@@ -7,7 +7,7 @@ from .material import PetroleumJelly, PP_Water
 from .magnet import RingMagnet
 
 class FixedProbe(NMRProbe):
-    def __init__(self):
+    def __init__(self, use_biot_savart=False):
         self.readout_length = 4.096*ms
         self.sampling_rate_online = 10*MHz
         self.sampling_rate_offline = 1*MHz
@@ -17,7 +17,8 @@ class FixedProbe(NMRProbe):
         fix_probe_coil = Coil(turns=32, # 0-27 equally distributed, 28-29 at one end, 30-31 at the other
                               length=15.0*mm,
                               diameter=4.6*mm,
-                              current=0.7*A)
+                              current=0.7*A,
+                              use_biot_savart=use_biot_savart)
         super(FixedProbe, self).__init__(length = 33.5*mm,
                          diameter = 2.5*mm,
                          material = PetroleumJelly,
