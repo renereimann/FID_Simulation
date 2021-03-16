@@ -8,7 +8,7 @@ from .hilbert_transform import HilbertTransform
 import matplotlib.pyplot as plt
 
 class PhaseFitFID(object):
-    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3):
+    def __init__(self, probe=None, edge_ignore=0.1*ms, frac=np.exp(-1), smoothing=True, tol=1e-5, n_smooth=3, phase_template_file=None):
         self.t0 = probe.time_pretrigger
         self.pretrigger = probe.time_pretrigger
         self.readout_length = probe.readout_length
@@ -17,6 +17,16 @@ class PhaseFitFID(object):
         self.smoothing = smoothing
         self.tol = tol
         self.n_smooth = n_smooth
+        if phase_template_file is not None:
+            self.load_template(phase_template_file)
+
+    def load_template(self, path):
+        if path.endswith(".root"):
+            import ROOT
+            file = ROOT.TFile.Open(path,"READ")
+            self.phase_template = np.reshape(file.Get("PhaseTemplate"), (-1, 4096))
+        else:
+            self.phase_template = np.genfromtxt(path, delimiter=",")
 
     def get_fit_range(self):
         t_min = np.min(self.time)
@@ -58,7 +68,7 @@ class PhaseFitFID(object):
         res = minimize(chi2, x0, tol=self.tol, method="L-BFGS-B")
         return res
 
-    def fit(self, time, flux):
+    def fit(self, time, flux, probe_id=0):
         self.time = time
         self.flux = flux
         hilbert = HilbertTransform(self.time, self.flux)
@@ -73,6 +83,9 @@ class PhaseFitFID(object):
             self.phase = self.apply_smoothing()
         else:
             self.phase = self.phase_raw[:]
+
+        if hasattr(self, "phase_template"):
+            self.phase -= self.phase_template[probe_id]
 
         self.res = self.chi2_fit()
         self.n_point_in_fit = np.sum(np.logical_and(self.time > np.min(self.t_range), self.time < np.max(self.t_range)))
