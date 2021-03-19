@@ -9,7 +9,7 @@ class Coil(object):
 
     You can calculate the magnetic field cause by the coil at any point in space.
     """
-    def __init__(self, turns, length, diameter, current):
+    def __init__(self, turns, length, diameter, current, use_biot_savart=False):
         r""" Generates a coil objsect.
 
         Parameters:
@@ -22,6 +22,7 @@ class Coil(object):
         self.length = length
         self.radius = diameter/2.
         self.current = current
+        self.use_biot_savart = use_biot_savart
 
     def B_field(self, x, y, z):
         r"""The magnetic field of the coil
