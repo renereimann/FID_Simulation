@@ -129,6 +129,64 @@ class PhaseFitFID(object):
         plt.text(self.t0/ms, 0.20, "trigger", rotation=90, va="top", ha="left", fontsize=12, fontweight='bold')
         plt.xlim(xmin=self.t0/ms*0.95)
 
+class PhaseFitRan(object):
+    def __init__(self, t0=-420*us, baseline_start=0, baseline_end=400, smooth_iterations=2, LengthReduction=0.4):
+        self.t0 = t0
+        self.baseline_start = baseline_start
+        self.baseline_end = baseline_end
+        self.smooth_iterations = smooth_iterations
+        self.LengthReduction = LengthReduction
+
+    def load_phase_template(self, path):
+        if path.endswith(".root"):
+            import ROOT
+            file = ROOT.TFile.Open(path,"READ")
+            self.phase_template = np.reshape(file.Get("PhaseTemplate"), (-1, 4096))
+            self.frequency_template = file.Get("FrequencyTemplate")
+        else:
+            self.phase_template = np.genfromtxt(path, delimiter=",")
+            self.frequency_template = None
+
+    def load_fit_range_template(self, path):
+        with open(path, "r") as open_file:
+            raw_data = json.load(open_file)
+        self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
+
+    def apply_smoothing(self, flux, MaxWidth=1000):
+        n = np.min(self.smoothWidth, MaxWidth)
+        smoothed_flux = flux[:]
+        for iter in range(self.smooth_iterations):
+            tmp = smoothed_flux[:]
+            for j in range(self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]):
+                val = [smoothed_flux[j]]
+                for n in range(1, n):
+                    if (j >= n+ self.fit_range_template[probe_id][0]):
+                        val.append(smoothed_flux[j-n])
+                    if (j + n <= self.fit_range_template[probe_id][1]):
+                        val.append(smoothed_flux[j+n])
+                tmp[j] = np.mean(val)
+            smoothed_flux = tmp[:]
+        return smoothed_flux
+
+    def fit(self, time, flux, probe_id):
+        time = time - self.t0
+        const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
+        flux = flux - const_baseline
+        hilbert = HilbertTransform(time, flux)
+        _, self.env =  hilbert.EnvelopeFunction()
+        _, self.phase_raw =  hilbert.PhaseFunction()
+        phase_raw = phase_raw - self.phase_template[probe_id]
+        mask = np.logical_and(time < self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1] < time)
+        f_estimate, offset_estimate, _, _, _ = linregress(time[mask], phase_raw[mask]/(2*np.pi))
+        f_estimate = f_estimate + self.frequency_template[probe_id]
+        dt = np.diff(time)[0]
+        self.smoothWidth = 1/f_estimate/dt if 20000*Hz <= f_estimate <= 100000*Hz else 1/51000*Hz/dt
+        phase = self.apply_smoothing(phase_raw)
+        mask = np.logical_and(time < self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][0]+(self.fit_range_template[probe_id][1]-self.fit_range_template[probe_id][0])*self.LengthReduction < time)
+        freq, offset, _, _, _ = linregress(time[mask], phase[mask]/(2*np.pi))
+        freq = freq+ self.frequency_template[probe_id]
+        return freq
+
 class PhaseFitEcho(PhaseFitFID):
     def __init__(self, frac=np.exp(-1), probe=None, smoothing=True, tol=1e-5, n_smooth=3):
         self.t0 = 2*probe.readout_length-probe.time_pretrigger
