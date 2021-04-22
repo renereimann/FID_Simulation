@@ -205,7 +205,7 @@ class PhaseFitRan(object):
             raw_data = json.load(open_file)
         self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
-    def apply_smoothing(self, flux, MaxWidth=1000):
+    def apply_smoothing(self, flux, probe_id, MaxWidth=1000):
         n = np.min([self.smoothWidth, MaxWidth])
         smoothed_flux = flux[:]
         for iter in range(self.smooth_iterations):
@@ -234,7 +234,7 @@ class PhaseFitRan(object):
         f_estimate = f_estimate + self.frequency_template[probe_id]*Hz
         dt = np.diff(time)[0]
         self.smoothWidth = 1/f_estimate/dt if 20000*Hz <= f_estimate <= 100000*Hz else 1/51000*Hz/dt
-        phase = self.apply_smoothing(phase_raw)
+        phase = self.apply_smoothing(phase_raw, probe_id)
         idx_stop = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
         freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop]/(2*np.pi))
         freq = freq+ self.frequency_template[probe_id]*Hz
