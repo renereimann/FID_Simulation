@@ -140,14 +140,65 @@ class PhaseFitRan(object):
         self.load_fit_range_template(fit_range_template_path)
 
     def load_phase_template(self, path):
-        if path.endswith(".root"):
-            import ROOT
-            file = ROOT.TFile.Open(path,"READ")
-            self.phase_template = np.reshape(file.Get("PhaseTemplate"), (-1, 4096))
-            self.frequency_template = file.Get("FrequencyTemplate")
-        else:
-            self.phase_template = np.genfromtxt(path, delimiter=",")
-            self.frequency_template = None
+        from ROOT import TTree, TFile, gROOT, AddressOf
+        gROOT.ProcessLine("""struct fidSettings_t {
+            Double_t const_baseline;
+            Double_t const_baseline_used;
+            Double_t edge_width;
+            Double_t edge_ignore;
+            Double_t start_amplitude;
+            Double_t baseline_freq_thresh;
+            Double_t filter_low_freq;
+            Double_t filter_high_freq;
+            Double_t filter_freq_width;
+            Double_t fft_peak_width;
+            Double_t centroid_thresh;
+            Double_t hyst_thresh;
+            Double_t snr_thresh;
+            Double_t len_thresh;
+            Double_t t0_shift;
+            Double_t t0_shift_corr;
+            Double_t LengthReduction;
+            Double_t LengthReduction1;
+            Double_t LengthReduction2;
+            Double_t LengthReduction3;
+            Double_t SpikeThreshold;
+            Double_t FreqTemplate[378];
+            Double_t PhaseTemplate[378*4096];
+            Int_t    PhaseTemplateN;
+            Int_t fit_range_scheme;
+            Int_t phase_fit_scheme;
+            Int_t SmoothWidth;
+            UInt_t TruncateBeginning;
+            UInt_t TruncateEnd;
+            UInt_t ZeroPadding;
+            UInt_t const_baseline_start;
+            UInt_t const_baseline_end;
+            UInt_t baseline_mode;
+            UInt_t baseline_event;
+            UInt_t SmoothIteration;
+            UInt_t poln;
+            UInt_t auto_filter_window;
+            UInt_t higher_order_correction;
+            UInt_t ha_npar;
+            UInt_t NSample;
+            UInt_t CompareDistance;
+            UInt_t HalfVetoWindow;
+            UInt_t FitStart[378];
+            UInt_t FitEnd[378];
+            UInt_t NZeros[378];
+            char filter[64];
+            char PhaseTemplateFile[128];
+            char TemplatePath[128];
+            char FitRangeTemplateFile[128];}""")
+        from ROOT import fidSettings_t
+        data = fidSettings_t()
+        f = TFile(path)
+        tree = f.Get("SettingsCollector/settings")
+        tree.SetBranchAddress("FixedProbeFid", AddressOf(data,"const_baseline"))
+        tree.GetEntry(0)
+        self.phase_template = np.array(np.frombuffer(data.PhaseTemplate, dtype='double').reshape([378,4096]))
+        self.frequency_template = np.array(np.frombuffer(data.FrequencyTemplate, dtype='double').reshape(378)))
 
     def load_fit_range_template(self, path):
         with open(path, "r") as open_file:
