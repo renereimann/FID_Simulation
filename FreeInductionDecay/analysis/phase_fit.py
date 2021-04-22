@@ -206,7 +206,7 @@ class PhaseFitRan(object):
         self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
     def apply_smoothing(self, flux, MaxWidth=1000):
-        n = np.min(self.smoothWidth, MaxWidth)
+        n = np.min([self.smoothWidth, MaxWidth])
         smoothed_flux = flux[:]
         for iter in range(self.smooth_iterations):
             tmp = smoothed_flux[:]
