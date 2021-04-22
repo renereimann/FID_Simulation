@@ -229,15 +229,15 @@ class PhaseFitRan(object):
         _, env =  hilbert.EnvelopeFunction()
         _, phase_raw =  hilbert.PhaseFunction()
         phase_raw = phase_raw - self.phase_template[probe_id]
-        mask = np.logical_and(time < self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1] < time)
-        f_estimate, offset_estimate, _, _, _ = linregress(time[mask], phase_raw[mask]/(2*np.pi))
-        f_estimate = f_estimate + self.frequency_template[probe_id]
+        idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
+        f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop]/(2*np.pi))
+        f_estimate = f_estimate + self.frequency_template[probe_id]*Hz
         dt = np.diff(time)[0]
         self.smoothWidth = 1/f_estimate/dt if 20000*Hz <= f_estimate <= 100000*Hz else 1/51000*Hz/dt
         phase = self.apply_smoothing(phase_raw)
-        mask = np.logical_and(time < self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][0]+(self.fit_range_template[probe_id][1]-self.fit_range_template[probe_id][0])*self.LengthReduction < time)
-        freq, offset, _, _, _ = linregress(time[mask], phase[mask]/(2*np.pi))
-        freq = freq+ self.frequency_template[probe_id]
+        idx_stop = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
+        freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop]/(2*np.pi))
+        freq = freq+ self.frequency_template[probe_id]*Hz
         return freq
 
 class PhaseFitEcho(PhaseFitFID):
