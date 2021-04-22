@@ -198,7 +198,7 @@ class PhaseFitRan(object):
         tree.SetBranchAddress("FixedProbeFid", AddressOf(data,"const_baseline"))
         tree.GetEntry(0)
         self.phase_template = np.array(np.frombuffer(data.PhaseTemplate, dtype='double').reshape([378,4096]))
-        self.frequency_template = np.array(np.frombuffer(data.FrequencyTemplate, dtype='double').reshape(378)))
+        self.frequency_template = np.array(np.frombuffer(data.FrequencyTemplate, dtype='double').reshape(378))
 
     def load_fit_range_template(self, path):
         with open(path, "r") as open_file:
