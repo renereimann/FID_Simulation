@@ -130,12 +130,14 @@ class PhaseFitFID(object):
         plt.xlim(xmin=self.t0/ms*0.95)
 
 class PhaseFitRan(object):
-    def __init__(self, t0=-420*us, baseline_start=0, baseline_end=400, smooth_iterations=2, LengthReduction=0.4):
+    def __init__(self, t0=-420*us, baseline_start=0, baseline_end=400, smooth_iterations=2, LengthReduction=0.4, phase_template_path=None, fit_range_template_path=None):
         self.t0 = t0
         self.baseline_start = baseline_start
         self.baseline_end = baseline_end
         self.smooth_iterations = smooth_iterations
         self.LengthReduction = LengthReduction
+        self.load_phase_template(phase_template_path)
+        self.load_fit_range_template(fit_range_template_path)
 
     def load_phase_template(self, path):
         if path.endswith(".root"):
@@ -173,8 +175,8 @@ class PhaseFitRan(object):
         const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
         flux = flux - const_baseline
         hilbert = HilbertTransform(time, flux)
-        _, self.env =  hilbert.EnvelopeFunction()
-        _, self.phase_raw =  hilbert.PhaseFunction()
+        _, env =  hilbert.EnvelopeFunction()
+        _, phase_raw =  hilbert.PhaseFunction()
         phase_raw = phase_raw - self.phase_template[probe_id]
         mask = np.logical_and(time < self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1] < time)
         f_estimate, offset_estimate, _, _, _ = linregress(time[mask], phase_raw[mask]/(2*np.pi))
