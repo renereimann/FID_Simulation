@@ -3,6 +3,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import linregress
 from scipy.ndimage.filters import uniform_filter1d
+from scipy.fftpack import fft, ifft, fftfreq
 from ..units import *
 from .hilbert_transform import HilbertTransform
 import json
@@ -221,13 +222,50 @@ class PhaseFitRan(object):
             smoothed_flux = tmp[:]
         return smoothed_flux
 
+    def phase_from_fft(self, time, flux, fft_peak_width=20000., FilterLowFreq=0., FilterHighFreq=200000., FilterFreqWidth=100000.):
+        time = time/s
+        flux = flux/uV
+        dt = np.diff(time)[0]
+        n = len(flux)
+        freq = fftfreq(n, d=dt)
+        fid_fft = fft(flux)/np.sqrt(n)
+        psd = np.abs(fid_fft)
+        interval = np.diff(freq)[0]
+        fft_peak_index_width = fft_peak_width / interval
+        k = np.argmax(psd)
+        i_fft = 1 if k < fft_peak_index_width else k-fft_peak_index_width
+        f_fft = n if k+fft_peak_index_width > m else k+fft_peak_index_width
+        half_width = np.floor(WindowFilterWidth/interval/2)
+        i_start = np.floor((WindowFilterLow-freq[0])/interval)
+        i_end = np.floor((WindowFilterHigh-freq[0])/interval)
+        if (i_end>=n-1): i_end = n-1
+        fid_fft_filtered = fid_fft[:]
+        fid_fft_filtered[np.logical_or(np.arange(n)<i_start, np.arange(n)>i_end)] = 0+0j
+        filtered_wf = fft(fid_fft_filtered)/np.sqrt(n)
+        wf_im = fft(fid_fft_filtered*(0-1j))/np.sqrt(n)
+        env = filtered_wf**2 + wf_im**2
+        phase = np.arctan2(wf_im, filtered_wf)
+        k=0
+        previous = phi[0]
+        for j in range(1,len(phi)):
+            u = phi[j] - previous
+            previous = phi[j]
+            if -u > 4.71: k+=1
+            if u > 4.71: k-=1
+            phi[j] += k*2*np.pi
+        return phi
+
     def fit(self, time, flux, probe_id):
         time = time + self.t0
         const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
         flux = flux - const_baseline
-        hilbert = HilbertTransform(time, flux)
-        _, env =  hilbert.EnvelopeFunction()
-        _, phase_raw =  hilbert.PhaseFunction()
+
+        phase_raw = self.phase_from_fft(time, flux)
+        #hilbert = HilbertTransform(time, flux)
+        #_, env =  hilbert.EnvelopeFunction()
+        #_, phase_raw =  hilbert.PhaseFunction()
+
+
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
         f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
