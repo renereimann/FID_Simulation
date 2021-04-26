@@ -255,6 +255,16 @@ class PhaseFitRan(object):
             phi[j] += k*2*np.pi
         return phi[::-1]
 
+    def linear_fit(x, y, start, stop, nPar):
+        N_eq = stop - start + 1
+        MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
+        RHSData = np.array(y[start:])
+        M = np.matmul(MatrixData.T,MatrixData)
+        b = np.matmul(MatrixData.T,RHSData)
+        M = np.linalg.inv(M)
+        solution = np.matmul(M*b)
+        return solution[1,0], solution[0,0], None, None, None
+
     def fit(self, time, flux, probe_id):
         time = time + self.t0
         const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
@@ -269,12 +279,14 @@ class PhaseFitRan(object):
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
         f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
+        f_estimate, offset_estimate, _, _, _ = self.linear_fit(time/s, phase_raw, idx_start, idx_stop, 2)
         f_estimate = f_estimate/(2*np.pi) + self.frequency_template[probe_id]*Hz
         dt = np.diff(time)[0]
         self.smoothWidth = np.floor(1/f_estimate/dt) if 20000*Hz <= f_estimate <= 100000*Hz else np.floor(1/51000*Hz/dt)
         phase = self.apply_smoothing(phase_raw, probe_id)
         idx_stop = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
-        freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
+        #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
+        freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
         freq = freq/(2*np.pi) + self.frequency_template[probe_id]*Hz
         return freq
 
