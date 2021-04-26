@@ -244,7 +244,7 @@ class PhaseFitRan(object):
         filtered_wf = fft(fid_fft_filtered)/np.sqrt(n)
         wf_im = fft(fid_fft_filtered*(0-1j))/np.sqrt(n)
         env = filtered_wf**2 + wf_im**2
-        phase = np.arctan2(wf_im, filtered_wf)
+        phase = np.arctan2(np.real(wf_im), np.real(filtered_wf))
         k=0
         previous = phi[0]
         for j in range(1,len(phi)):
