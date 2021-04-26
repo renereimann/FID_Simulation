@@ -259,14 +259,10 @@ class PhaseFitRan(object):
         N_Eq = stop - start + 1
         MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
         RHSData = np.array(y[start:stop+1])
-        print(np.shape(MatrixData), np.shape(RHSData))
         M = np.matmul(MatrixData.T,MatrixData)
-        print(np.shape(M))
         b = np.matmul(MatrixData.T,RHSData)
-        print(np.shape(b))
         M = np.linalg.inv(M)
-        print(np.shape(M))
-        solution = np.matmul(M*b)
+        solution = np.matmul(M,b)
         print(np.shape(solution))
         return solution[1,0], solution[0,0], None, None, None
 
