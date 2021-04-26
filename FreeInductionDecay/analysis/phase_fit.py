@@ -253,7 +253,7 @@ class PhaseFitRan(object):
             if -u > 4.71: k+=1
             if u > 4.71: k-=1
             phi[j] += k*2*np.pi
-        return phi
+        return phi[::-1]
 
     def fit(self, time, flux, probe_id):
         time = time + self.t0
