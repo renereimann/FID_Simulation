@@ -222,7 +222,7 @@ class PhaseFitRan(object):
         return smoothed_flux
 
     def fit(self, time, flux, probe_id):
-        time = time - self.t0
+        time = time + self.t0
         const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
         flux = flux - const_baseline
         hilbert = HilbertTransform(time, flux)
