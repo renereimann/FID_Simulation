@@ -263,8 +263,7 @@ class PhaseFitRan(object):
         b = np.matmul(MatrixData.T,RHSData)
         M = np.linalg.inv(M)
         solution = np.matmul(M,b)
-        print(np.shape(solution))
-        return solution[1,0], solution[0,0], None, None, None
+        return solution[1], solution[0], None, None, None
 
     def fit(self, time, flux, probe_id):
         time = time + self.t0
