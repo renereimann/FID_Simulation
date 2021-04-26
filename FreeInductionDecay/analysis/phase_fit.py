@@ -255,7 +255,7 @@ class PhaseFitRan(object):
             phi[j] += k*2*np.pi
         return phi[::-1]
 
-    def linear_fit(self, x, y, start, stop, nPar):
+    def linear_fit(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
         MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
         RHSData = np.array(y[start:])
