@@ -224,7 +224,7 @@ class PhaseFitRan(object):
 
     def phase_from_fft(self, time, flux, fft_peak_width=20000., WindowFilterLow=0., WindowFilterHigh=200000., WindowFilterWidth=100000.):
         time = time/s
-        flux = flux/uV
+        flux = flux
         dt = np.diff(time)[0]
         n = len(flux)
         freq = fftfreq(n, d=dt)
