@@ -9,6 +9,7 @@ from .hilbert_transform import HilbertTransform
 import copy
 import json
 import matplotlib.pyplot as plt
+from ROOT import TMatrixD
 
 class PhaseFitFID(object):
     fit_version = {"t3_odd": {"nParams": 3, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3},
