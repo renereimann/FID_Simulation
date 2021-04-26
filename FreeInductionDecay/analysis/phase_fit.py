@@ -222,7 +222,7 @@ class PhaseFitRan(object):
             smoothed_flux = tmp[:]
         return smoothed_flux
 
-    def phase_from_fft(self, time, flux, fft_peak_width=20000., FilterLowFreq=0., FilterHighFreq=200000., FilterFreqWidth=100000.):
+    def phase_from_fft(self, time, flux, fft_peak_width=20000., WindowFilterLow=0., WindowFilterHigh=200000., WindowFilterWidth=100000.):
         time = time/s
         flux = flux/uV
         dt = np.diff(time)[0]
