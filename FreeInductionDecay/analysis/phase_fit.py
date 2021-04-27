@@ -297,10 +297,10 @@ class PhaseFitRan(object):
         const_baseline = np.mean(fluxes[self.baseline_start:self.baseline_end])
         flux = fluxes - const_baseline
 
-        #phase_raw = self.phase_from_fft(time, flux)
-        hilbert = HilbertTransform(time, flux*uV)
-        _, env =  hilbert.EnvelopeFunction()
-        _, phase_raw =  hilbert.PhaseFunction()
+        phase_raw = self.phase_from_fft(time, flux)
+        #hilbert = HilbertTransform(time, flux*uV)
+        #_, env =  hilbert.EnvelopeFunction()
+        #_, phase_raw =  hilbert.PhaseFunction()
 
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
