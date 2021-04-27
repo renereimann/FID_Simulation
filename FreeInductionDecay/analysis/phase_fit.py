@@ -292,30 +292,30 @@ class PhaseFitRan(object):
         solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
-    def fit(self, time, flux, probe_id):
-        time = time + self.t0
-        const_baseline = np.mean(flux[self.baseline_start:self.baseline_end])
-        flux = flux - const_baseline
+    def fit(self, times, fluxes, probe_id):
+        time = times + self.t0
+        const_baseline = np.mean(fluxes[self.baseline_start:self.baseline_end])
+        flux = fluxes - const_baseline
 
-        phase_raw = self.phase_from_fft(time, flux)
-        #hilbert = HilbertTransform(time, flux)
-        #_, env =  hilbert.EnvelopeFunction()
-        #_, phase_raw =  hilbert.PhaseFunction()
+        #phase_raw = self.phase_from_fft(time, flux)
+        hilbert = HilbertTransform(time, flux*uV)
+        _, env =  hilbert.EnvelopeFunction()
+        _, phase_raw =  hilbert.PhaseFunction()
 
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
         #f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
         #f_estimate, offset_estimate, _, _, _ = self.linear_fit(time/s, phase_raw, idx_start, idx_stop, 2)
         f_estimate, offset_estimate, _, _, _ = self.linear_fit_root(time/s, phase_raw, idx_start, idx_stop, 2)
-        f_estimate = f_estimate/(2*np.pi) + self.frequency_template[probe_id]*Hz
-        dt = np.diff(time)[0]
-        self.smoothWidth = np.floor(1/f_estimate/dt) if 20000*Hz <= f_estimate <= 100000*Hz else np.floor(1/51000*Hz/dt)
+        f_estimate = f_estimate/(2*np.pi) + self.frequency_template[probe_id]
+        dt = np.diff(time)[0]/s
+        self.smoothWidth = np.floor(1/f_estimate/dt) if 20000 <= f_estimate <= 100000 else np.floor(1/51000/dt)
         phase = self.apply_smoothing(phase_raw, probe_id)
-        idx_stop = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
+        idx_stop_short = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
         #freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
-        freq, offset, _, _, _ = self.linear_fit_root(time/s, phase, idx_start, idx_stop, 2)
-        freq = freq/(2*np.pi) + self.frequency_template[probe_id]*Hz
+        freq, offset, _, _, _ = self.linear_fit_root(time/s, phase, idx_start, idx_stop_short, 2)
+        freq = freq/(2*np.pi) + self.frequency_template[probe_id]
         return freq
 
 class PhaseFitEcho(PhaseFitFID):
