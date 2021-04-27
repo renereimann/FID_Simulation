@@ -11,6 +11,19 @@ import json
 import matplotlib.pyplot as plt
 from ROOT import TMatrixD
 
+def MatrixInvertRoot(M, tol=1e-32):
+    M_root = TMatrixD(np.shape(M)[0], np.shape(M)[1])
+    for i in range(np.shape(M)[0]):
+        for j in range(np.shape(M)[1]):
+            M_root[i][j] = M[i,j]
+    M_root.SetTol(tol)
+    M_root.Invert()
+    M_inv = np.zeros_like(M)
+    for i in range(np.shape(M)[0]):
+        for j in range(np.shape(M)[1]):
+            M_inv[i,j] = M_root[i][j]
+    return M_inv
+
 class PhaseFitFID(object):
     fit_version = {"t3_odd": {"nParams": 3, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3},
                    "t5_odd": {"nParams": 4, "func": lambda t, p: p[0] + p[1]*t             + p[2]*t**3             + p[3]*t**5},
@@ -263,24 +276,20 @@ class PhaseFitRan(object):
         RHSData = np.array(y[start:stop+1])
         M = np.matmul(MatrixData.T,MatrixData)
         b = np.matmul(MatrixData.T,RHSData)
-        M = np.linalg.inv(M)
+        M_inv = np.linalg.inv(M)
         #M = np.linalg.pinv(M)
-        solution = np.matmul(M,b)
+        solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
     def linear_fit_root(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
-        A = TMatrixD(N_Eq, NPar)
-        RHS = TMatrixD(N_Eq, 1)
-        for i in range(N_Eq):
-            for j in range(NPar):
-                A[i][j] = x[start+i]**j
-            RHS[i] = y[start+i]
-        AT = A.T()
-        M = AT*A
-        b = AT*RHS
-        M.SetTol(1e-32)
-        print(M.Invert())
+        MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
+        RHSData = np.array(y[start:stop+1])
+        M = np.matmul(MatrixData.T,MatrixData)
+        b = np.matmul(MatrixData.T,RHSData)
+        M_inv = MatrixInvertRoot(M, tol=1e-32)
+        #M = np.linalg.pinv(M)
+        solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
     def fit(self, time, flux, probe_id):
@@ -292,7 +301,6 @@ class PhaseFitRan(object):
         #hilbert = HilbertTransform(time, flux)
         #_, env =  hilbert.EnvelopeFunction()
         #_, phase_raw =  hilbert.PhaseFunction()
-
 
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
