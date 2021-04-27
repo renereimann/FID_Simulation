@@ -283,8 +283,8 @@ class PhaseFitRan(object):
 
     def linear_fit_root(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
-        MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
-        RHSData = np.array(y[start:stop+1])
+        MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)], dtype=np.float64)
+        RHSData = np.array(y[start:stop+1], dtype=np.float64)
         M = np.matmul(MatrixData.T,MatrixData)
         b = np.matmul(MatrixData.T,RHSData)
         M_inv = MatrixInvertRoot(M, tol=1e-32)
