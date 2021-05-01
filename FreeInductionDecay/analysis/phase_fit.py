@@ -237,38 +237,19 @@ class PhaseFitRan(object):
             smoothed_flux = tmp[:]
         return smoothed_flux
 
-    def phase_from_fft(self, time, flux, fft_peak_width=20000., WindowFilterLow=0., WindowFilterHigh=200000., WindowFilterWidth=100000.):
-        time = time/s
-        flux = flux
-        dt = np.diff(time)[0]
-        n = len(flux)
-        freq = fftfreq(n, d=dt)
-        fid_fft = fft(flux)/np.sqrt(n)
-        psd = np.abs(fid_fft)
-        interval = np.diff(freq)[0]
-        fft_peak_index_width = fft_peak_width / interval
-        k = np.argmax(psd)
-        i_fft = 1 if k < fft_peak_index_width else k-fft_peak_index_width
-        f_fft = n if k+fft_peak_index_width > m else k+fft_peak_index_width
-        half_width = np.floor(WindowFilterWidth/interval/2)
-        i_start = np.floor((WindowFilterLow-freq[0])/interval)
-        i_end = np.floor((WindowFilterHigh-freq[0])/interval)
-        if (i_end>=n-1): i_end = n-1
-        fid_fft_filtered = fid_fft[:]
-        fid_fft_filtered[np.logical_or(np.arange(n)<i_start, np.arange(n)>i_end)] = 0+0j
-        filtered_wf = fft(fid_fft_filtered)/np.sqrt(n)
-        wf_im = fft(fid_fft_filtered*(0-1j))/np.sqrt(n)
-        env = filtered_wf**2 + wf_im**2
-        phi = np.arctan2(np.real(wf_im), np.real(filtered_wf))
-        k=0
-        previous = phi[0]
-        for j in range(1,len(phi)):
-            u = phi[j] - previous
-            previous = phi[j]
-            if -u > 4.71: k+=1
-            if u > 4.71: k-=1
-            phi[j] += k*2*np.pi
-        return phi[::-1]
+    def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
+        # identical to hilbert except the filter line
+        freq = fftfreq(len(flux), d=np.diff(time)[0]/s)
+        fid_fft_filtered = fft(flux)
+        fid_fft_filtered[np.logical_not(np.logical_and(WindowFilterLow<=np.abs(freq), np.abs(freq)<=WindowFilterHigh))] = 0+0j
+        filtered_wf = np.real(ifft(fid_fft_filtered))
+        wf_im = np.real(ifft(fid_fft_filtered*(-1j)*np.sign(freq)))
+
+        phi = np.arctan2(wf_im, filtered_wf)
+        jump = 1*(phi[:-1] - phi[1:] > 4.71)
+        jump -= 1*(phi[1:] - phi[:-1] > 4.71)
+        phi += np.concatenate([[0], 2*np.pi*np.cumsum(jump)])
+        return phi
 
     def linear_fit(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
@@ -296,12 +277,7 @@ class PhaseFitRan(object):
         time = times + self.t0
         const_baseline = np.mean(fluxes[self.baseline_start:self.baseline_end])
         flux = fluxes - const_baseline
-
-        phase_raw = self.phase_from_fft(time, flux)
-        #hilbert = HilbertTransform(time, flux*uV)
-        #_, env =  hilbert.EnvelopeFunction()
-        #_, phase_raw =  hilbert.PhaseFunction()
-
+        phase_raw = self.phase_from_fft(time, flux) # same as hilbert but with additional filtering
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
         #f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
