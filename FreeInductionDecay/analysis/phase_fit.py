@@ -221,7 +221,7 @@ class PhaseFitRan(object):
             raw_data = json.load(open_file)
         self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
-    def apply_smoothing(self, flux, probe_id, MaxWidth=1000):
+    def apply_smoothing(self, flux, MaxWidth=1000):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
         print(nWidth)
         smoothed_flux = copy.deepcopy(flux)
