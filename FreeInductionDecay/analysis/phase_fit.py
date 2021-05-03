@@ -278,7 +278,7 @@ class PhaseFitRan(object):
         dt = np.diff(time)[0]/s
         self.smoothWidth = np.floor(1/f_estimate/dt) if 20000 <= f_estimate <= 100000 else np.floor(1/51000/dt)
         phase = self.apply_smoothing(phase_raw)
-        idx_stop_short = idx_start + np.round((idx_stop-idx_start)*self.LengthReduction)
+        idx_stop_short = idx_start + int(np.round((idx_stop-idx_start)*self.LengthReduction))
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
         #freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
         freq, offset, _, _, _ = self.linear_fit_root(time/s, phase, idx_start, idx_stop_short, 2)
