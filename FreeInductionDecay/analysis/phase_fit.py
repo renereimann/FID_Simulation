@@ -228,14 +228,14 @@ class PhaseFitRan(object):
         tmp = copy.deepcopy(smoothed_flux)
         for iter in range(self.smooth_iterations):
             for j in range(4095+1):
-                val = [tmp[j]]
-                for n in range(1, nWidth):
-                    if (j >= n):
-                        val.append(tmp[j-n])
-                    if (j + n <= 4095):
-                        val.append(tmp[j+n])
-                print(np.sum(val), len(val))
-                smoothed_flux[j] = np.mean(val)
+                #val = [tmp[j]]
+                #for n in range(1, nWidth):
+                #    if (j >= n):
+                #        val.append(tmp[j-n])
+                #    if (j + n <= 4095):
+                #        val.append(tmp[j+n])
+                #smoothed_flux[j] = np.mean(val)
+                smoothed_flux[j] = np.mean([tmp[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<=4095])
             tmp = copy.deepcopy(smoothed_flux)
         return smoothed_flux
 
