@@ -226,13 +226,14 @@ class PhaseFitRan(object):
         smoothed_flux = flux[:]
         for iter in range(self.smooth_iterations):
             tmp = smoothed_flux[:]
-            for j in range(self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]):
+            for j in range(self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]+1):
                 val = [smoothed_flux[j]]
                 for n in range(1, nWidth):
                     if (j >= n+ self.fit_range_template[probe_id][0]):
                         val.append(smoothed_flux[j-n])
                     if (j + n <= self.fit_range_template[probe_id][1]):
                         val.append(smoothed_flux[j+n])
+                print(np.sum(val), len(val))
                 tmp[j] = np.mean(val)
             smoothed_flux = tmp[:]
         return smoothed_flux
@@ -287,7 +288,6 @@ class PhaseFitRan(object):
         dt = np.diff(time)[0]/s
         self.smoothWidth = np.floor(1/f_estimate/dt) if 20000 <= f_estimate <= 100000 else np.floor(1/51000/dt)
         phase = self.apply_smoothing(phase_raw, probe_id)
-        phase = phase_raw[:]
         idx_stop_short = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
         #freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
