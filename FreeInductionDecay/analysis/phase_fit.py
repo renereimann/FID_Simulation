@@ -223,13 +223,9 @@ class PhaseFitRan(object):
 
     def apply_smoothing(self, flux, MaxWidth=1000):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
-        smoothed_flux = copy.deepcopy(flux)
-        # tmp = copy.deepcopy(smoothed_flux)
+        smoothed_flux = flux[:]
         for iter in range(self.smooth_iterations):
-            #for j in range(4096):
-            #    smoothed_flux[j] = np.mean([tmp[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096])
-            #tmp = copy.deepcopy(smoothed_flux)
-            smoothed_flux = [np.mean([smoothed_flux[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096]) for j in range(4096)]
+            smoothed_flux = np.array([np.mean([smoothed_flux[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096]) for j in range(4096)])
         return smoothed_flux
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
@@ -285,7 +281,6 @@ class PhaseFitRan(object):
         idx_stop_short = idx_start + int((idx_stop-idx_start)*self.LengthReduction)
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
         #freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
-
         freq, offset, _, _, _ = self.linear_fit_root(time/s, phase, idx_start, idx_stop_short, 2)
         freq = freq/(2*np.pi) + self.frequency_template[probe_id]
         return freq
