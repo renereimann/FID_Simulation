@@ -229,7 +229,7 @@ class PhaseFitRan(object):
             #for j in range(4096):
             #    smoothed_flux[j] = np.mean([tmp[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096])
             #tmp = copy.deepcopy(smoothed_flux)
-            smoothed_flux = [np.mean([tmp[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096]) for j in range(4096)]
+            smoothed_flux = [np.mean([smoothed_flux[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096]) for j in range(4096)]
         return smoothed_flux
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
