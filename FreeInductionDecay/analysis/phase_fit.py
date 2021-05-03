@@ -224,7 +224,7 @@ class PhaseFitRan(object):
     def apply_smoothing(self, flux, probe_id, MaxWidth=1000):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
         print(nWidth)
-        smoothed_flux = flux[:]
+        smoothed_flux = copy.deepcopy(flux)
         for iter in range(self.smooth_iterations):
             tmp = smoothed_flux[:]
             for j in range(4096):
