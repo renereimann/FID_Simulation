@@ -225,18 +225,18 @@ class PhaseFitRan(object):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
         print(nWidth)
         smoothed_flux = copy.deepcopy(flux)
+        tmp = copy.deepcopy(smoothed_flux)
         for iter in range(self.smooth_iterations):
-            tmp = smoothed_flux[:]
-            for j in range(4096):
-                val = [smoothed_flux[j]]
+            for j in range(4095+1):
+                val = [tmp[j]]
                 for n in range(1, nWidth):
                     if (j >= n):
-                        val.append(smoothed_flux[j-n])
-                    if (j + n <= 4096-1):
-                        val.append(smoothed_flux[j+n])
+                        val.append(tmp[j-n])
+                    if (j + n <= 4095):
+                        val.append(tmp[j+n])
                 print(np.sum(val), len(val))
-                tmp[j] = np.mean(val)
-            smoothed_flux = tmp[:]
+                smoothed_flux[j] = np.mean(val)
+            tmp = copy.deepcopy(smoothed_flux)
         return smoothed_flux
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
