@@ -223,15 +223,16 @@ class PhaseFitRan(object):
 
     def apply_smoothing(self, flux, probe_id, MaxWidth=1000):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
+        print(nWidth)
         smoothed_flux = flux[:]
         for iter in range(self.smooth_iterations):
             tmp = smoothed_flux[:]
-            for j in range(self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]+1):
+            for j in range(4096):
                 val = [smoothed_flux[j]]
                 for n in range(1, nWidth):
-                    if (j >= n+ self.fit_range_template[probe_id][0]):
+                    if (j >= n):
                         val.append(smoothed_flux[j-n])
-                    if (j + n <= self.fit_range_template[probe_id][1]):
+                    if (j + n <= 4096-1):
                         val.append(smoothed_flux[j+n])
                 print(np.sum(val), len(val))
                 tmp[j] = np.mean(val)
