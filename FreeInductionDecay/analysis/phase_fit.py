@@ -244,23 +244,13 @@ class PhaseFitRan(object):
 
     def linear_fit(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
-        MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)])
-        RHSData = np.array(y[start:stop+1])
-        M = np.matmul(MatrixData.T,MatrixData)
-        b = np.matmul(MatrixData.T,RHSData)
-        M_inv = np.linalg.inv(M)
-        #M = np.linalg.pinv(M)
-        solution = np.matmul(M_inv,b)
-        return solution[1], solution[0], None, None, None
-
-    def linear_fit_root(self, x, y, start, stop, NPar):
-        N_Eq = stop - start + 1
         MatrixData = np.array([[x[start+i]**j for j in range(NPar)] for i in range(N_Eq)], dtype=np.float64)
         RHSData = np.array(y[start:stop+1], dtype=np.float64)
         M = np.matmul(MatrixData.T,MatrixData)
         b = np.matmul(MatrixData.T,RHSData)
-        M_inv = MatrixInvertRoot(M, tol=1e-32)
-        #M = np.linalg.pinv(M)
+        M_inv = np.linalg.inv(M)
+        #M_inv = np.linalg.pinv(M)
+        #M_inv = MatrixInvertRoot(M, tol=1e-32)
         solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
@@ -272,16 +262,14 @@ class PhaseFitRan(object):
         phase_raw = phase_raw - self.phase_template[probe_id]
         idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
         #f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
-        #f_estimate, offset_estimate, _, _, _ = self.linear_fit(time/s, phase_raw, idx_start, idx_stop, 2)
-        f_estimate, offset_estimate, _, _, _ = self.linear_fit_root(time/s, phase_raw, idx_start, idx_stop, 2)
+        f_estimate, offset_estimate, _, _, _ = self.linear_fit(time/s, phase_raw, idx_start, idx_stop, 2)
         f_estimate = f_estimate/(2*np.pi) + self.frequency_template[probe_id]
         dt = np.diff(time)[0]/s
         self.smoothWidth = np.floor(1/f_estimate/dt) if 20000 <= f_estimate <= 100000 else np.floor(1/51000/dt)
         phase = self.apply_smoothing(phase_raw)
         idx_stop_short = idx_start + int(np.round((idx_stop-idx_start)*self.LengthReduction))
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
-        #freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
-        freq, offset, _, _, _ = self.linear_fit_root(time/s, phase, idx_start, idx_stop_short, 2)
+        freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
         freq = freq/(2*np.pi) + self.frequency_template[probe_id]
         return freq
 
