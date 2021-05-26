@@ -221,11 +221,21 @@ class PhaseFitRan(object):
             raw_data = json.load(open_file)
         self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
-    def apply_smoothing(self, flux, MaxWidth=1000):
+    def apply_smoothing(self, flux, MaxWidth=1000, start=0, end=4096-1):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
-        smoothed_flux = flux[:]
+        VecIn = copy.deepcopy(flux[:])
+        VecTemp = copy.deepcopy(VecIn[:])
         for iter in range(self.smooth_iterations):
-            smoothed_flux = np.array([np.mean([smoothed_flux[j+n] for n in range(-nWidth+1, nWidth) if 0 <=(n+j) and (n+j)<4096]) for j in range(4096)])
+            for j in range(start, end+1):
+                 FilteredVal = [VecTemp[j]]             
+                 for n in range(1, nWidth):
+                     if j >= n+start:
+                         FilteredVal.append(VecTemp[j-n])
+                     if j + n <= end:
+                         FilteredVal.append(VecTemp[j+n])
+                 VecIn[j] = np.mean(FilteredVal)
+	    VecTemp = copy.deepcopy(VecIn[:])
+        smoothed_flux = copy.deepcopy(VecIn[:])
         return smoothed_flux
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
