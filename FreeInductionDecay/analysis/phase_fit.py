@@ -227,13 +227,16 @@ class PhaseFitRan(object):
         VecTemp = copy.deepcopy(VecIn[:])
         for iter in range(self.smooth_iterations):
             for j in range(start, end+1):
-                 FilteredVal = [VecTemp[j]]             
+                 FilteredVal = VecTemp[j]            
+                 counter = 1 
                  for n in range(1, nWidth):
                      if j >= n+start:
-                         FilteredVal.append(VecTemp[j-n])
+                         FilteredVal += VecTemp[j-n]
+                         counter += 1
                      if j + n <= end:
-                         FilteredVal.append(VecTemp[j+n])
-                 VecIn[j] = np.mean(FilteredVal)
+                         FilteredVal += VecTemp[j+n]
+                         counter += 1
+                 VecIn[j] = FilteredVal/counter
 	    VecTemp = copy.deepcopy(VecIn[:])
         smoothed_flux = copy.deepcopy(VecIn[:])
         return smoothed_flux
