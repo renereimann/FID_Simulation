@@ -221,22 +221,12 @@ class PhaseFitRan(object):
             raw_data = json.load(open_file)
         self.fit_range_template = {entry["Probe ID"]: (entry["Fid Begin"], entry["Fid End"]) for entry in raw_data}
 
-    def apply_smoothing(self, flux, MaxWidth=1000, start=0, end=4096-1):
+    def apply_smoothing(self, flux, MaxWidth=1000, start=0, end=4096):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
-        VecIn = copy.deepcopy(flux[:])
-        VecTemp = copy.deepcopy(VecIn[:])
+        smoothed = flux[:]
         for iter in range(self.smooth_iterations):
-            for j in range(start, end+1):
-                 FilteredVal = [VecTemp[j]]             
-                 for n in range(1, nWidth):
-                     if j >= n+start:
-                         FilteredVal.append(VecTemp[j-n])
-                     if j + n <= end:
-                         FilteredVal.append(VecTemp[j+n])
-                 VecIn[j] = np.mean(FilteredVal)
-	    VecTemp = copy.deepcopy(VecIn[:])
-        smoothed_flux = copy.deepcopy(VecIn[:])
-        return smoothed_flux
+            smoothed = np.array([np.mean(smoothed[max([j-(nWidth-1), start]):min([j+nWidth, end])]) for j in range(start, end)])
+        return smoothed
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
         # identical to hilbert except the filter line
