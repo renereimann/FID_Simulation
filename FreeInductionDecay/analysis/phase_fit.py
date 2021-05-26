@@ -225,25 +225,8 @@ class PhaseFitRan(object):
         nWidth = int(np.min([self.smoothWidth, MaxWidth]))
         smoothed = flux[:]
         for iter in range(self.smooth_iterations):
-<<<<<<< HEAD
             smoothed = np.array([np.mean(smoothed[max([j-(nWidth-1), start]):min([j+nWidth, end])]) for j in range(start, end)])
         return smoothed
-=======
-            for j in range(start, end+1):
-                 FilteredVal = VecTemp[j]            
-                 counter = 1 
-                 for n in range(1, nWidth):
-                     if j >= n+start:
-                         FilteredVal += VecTemp[j-n]
-                         counter += 1
-                     if j + n <= end:
-                         FilteredVal += VecTemp[j+n]
-                         counter += 1
-                 VecIn[j] = FilteredVal/counter
-	    VecTemp = copy.deepcopy(VecIn[:])
-        smoothed_flux = copy.deepcopy(VecIn[:])
-        return smoothed_flux
->>>>>>> aff486667fac955c046ce60f681e519a53510c0b
 
     def phase_from_fft(self, time, flux, WindowFilterLow=0., WindowFilterHigh=200000.):
         # identical to hilbert except the filter line
