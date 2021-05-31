@@ -248,9 +248,9 @@ class PhaseFitRan(object):
         RHSData = np.array(y[start:stop+1], dtype=np.float64)
         M = np.matmul(MatrixData.T,MatrixData)
         b = np.matmul(MatrixData.T,RHSData)
-        M_inv = np.linalg.inv(M)
+        #M_inv = np.linalg.inv(M)
         #M_inv = np.linalg.pinv(M)
-        #M_inv = MatrixInvertRoot(M, tol=1e-32)
+        M_inv = MatrixInvertRoot(M, tol=1e-32)
         solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
@@ -269,7 +269,7 @@ class PhaseFitRan(object):
         phase = self.apply_smoothing(phase_raw)
         idx_stop_short = idx_start + int(np.round((idx_stop-idx_start)*self.LengthReduction))
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
-        freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop, 2)
+        freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop_short, 2)
         freq = freq/(2*np.pi) + self.frequency_template[probe_id]
         return freq
 
