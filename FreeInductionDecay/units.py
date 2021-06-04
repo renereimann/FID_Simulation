@@ -13,3 +13,5 @@ ppb = 1e-9
 ppt = 1e-12
 ppq = 1e-15
 T0 = -273.15*K
+
+ADC_count = 1
