@@ -152,8 +152,14 @@ class PhaseFitRan(object):
         self.baseline_end = baseline_end
         self.smooth_iterations = smooth_iterations
         self.LengthReduction = LengthReduction
-        self.load_phase_template(phase_template_path)
-        self.load_fit_range_template(fit_range_template_path)
+        self.edge_ignore = 60*us
+        self.start_amplitude = 0.37
+        self.use_phase_template = phase_template_path is not None
+        if self.use_phase_template:
+            self.load_phase_template(phase_template_path)
+        self.use_fit_range_template = fit_range_template_path is not None
+        if self.use_fit_range_template:
+            self.load_fit_range_template(fit_range_template_path)
 
     def load_phase_template(self, path):
         from ROOT import TTree, TFile, gROOT, AddressOf
@@ -237,10 +243,11 @@ class PhaseFitRan(object):
         wf_im = np.real(ifft(fid_fft_filtered*(-1j)*np.sign(freq)))
 
         phi = np.arctan2(wf_im, filtered_wf)
+        env = np.sqrt(filtered_wf**2 + wf_im**2)
         jump = 1*(phi[:-1] - phi[1:] > 4.71)
         jump -= 1*(phi[1:] - phi[:-1] > 4.71)
         phi += np.concatenate([[0], 2*np.pi*np.cumsum(jump)])
-        return phi
+        return filtered_wf, phi, env
 
     def linear_fit(self, x, y, start, stop, NPar):
         N_Eq = stop - start + 1
@@ -254,23 +261,59 @@ class PhaseFitRan(object):
         solution = np.matmul(M_inv,b)
         return solution[1], solution[0], None, None, None
 
+    def get_fit_range(self, env, filtered_wf, dt):
+        Length = len(env)
+        nIgnore = np.floor(self.edge_ignore/dt);
+
+        # Find the maximum of the envelope
+        k = np.argmax(env[nIgnore:-nIgnore]) + nIgnore + nIgnore # bug
+
+        #Start from the next falling zero-crossing
+        while True:
+            if ((filtered_wf[k]>=0 and filtered_wf[k+1]<0) or k>=Length-nIgnore-1): break
+            k+=1
+        idx_start = k-2 if k>=0 else k
+
+        # Find the point where the amplitude dropped to fraction
+        rel = env[k]
+        while True:
+            if env[k]<rel*self.start_amplitude or k>=Length-nIgnore: break
+            k+=1
+
+        #End at the previous falling zero-crossing
+        while True:
+            if (k<=nIgnore+1): break
+            if (filtered_wf[k]<=0 and filtered_wf[k-1]>0): break
+            k-=1
+        idx_stop = k+2 if k<=Length-3 else k
+
+        return idx_start, idx_stop
+
     def fit(self, times, fluxes, probe_id):
         time = times + self.t0
+        dt = np.diff(time)[0]/s
         const_baseline = np.mean(fluxes[self.baseline_start:self.baseline_end])
         flux = fluxes - const_baseline
-        phase_raw = self.phase_from_fft(time, flux) # same as hilbert but with additional filtering
-        phase_raw = phase_raw - self.phase_template[probe_id]
-        idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
+        filtered_wf, phase_raw, env = self.phase_from_fft(time, flux) # same as hilbert but with additional filtering
+        if self.use_phase_template:
+            phase_raw = phase_raw - self.phase_template[probe_id]
+        if self.use_fit_range_template:
+            idx_start, idx_stop = self.fit_range_template[probe_id][0], self.fit_range_template[probe_id][1]
+        else:
+            idx_start, idx_stop = self.get_fit_range(env, filtered_wf, dt)
         #f_estimate, offset_estimate, _, _, _ = linregress(time[idx_start:idx_stop], phase_raw[idx_start:idx_stop])
         f_estimate, offset_estimate, _, _, _ = self.linear_fit(time/s, phase_raw, idx_start, idx_stop, 2)
-        f_estimate = f_estimate/(2*np.pi) + self.frequency_template[probe_id]
-        dt = np.diff(time)[0]/s
+        f_estimate = f_estimate/(2*np.pi)
+        if self.use_phase_template:
+            f_estimate += self.frequency_template[probe_id]
         self.smoothWidth = np.floor(1/f_estimate/dt) if 20000 <= f_estimate <= 100000 else np.floor(1/51000/dt)
         phase = self.apply_smoothing(phase_raw)
         idx_stop_short = idx_start + int(np.round((idx_stop-idx_start)*self.LengthReduction))
         #freq, offset, _, _, _ = linregress(time[idx_start:idx_stop], phase[idx_start:idx_stop])
         freq, offset, _, _, _ = self.linear_fit(time/s, phase, idx_start, idx_stop_short, 2)
-        freq = freq/(2*np.pi) + self.frequency_template[probe_id]
+        freq = freq/(2*np.pi)
+        if self.use_phase_template:
+            freq += self.frequency_template[probe_id]
         return freq
 
 class PhaseFitEcho(PhaseFitFID):
