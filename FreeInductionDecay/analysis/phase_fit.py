@@ -163,6 +163,7 @@ class PhaseFitRan(object):
 
     def load_phase_template(self, path):
         from ROOT import TTree, TFile, gROOT, AddressOf
+        # struct defined as in here: https://cdcvs.fnal.gov/redmine/projects/gm2field/repository/revisions/develop/entry/include/RootTreeStructs.hh#L657
         gROOT.ProcessLine("""struct fidSettings_t {
             Double_t const_baseline;
             Double_t const_baseline_used;
