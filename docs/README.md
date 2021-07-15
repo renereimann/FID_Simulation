@@ -1,3 +1,20 @@
+# Goal of the Package
+
+## Installation
+
+## Description of Physics
+
+## Description of Simulation principle
+
+## Examples
+
+## Limitations of Approximations
+
+## API Documentation
+
+## ToDo List
+
+
 * Simulation
   * t_90
     * I am still not sure about the exact relation between current and t_90
