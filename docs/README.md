@@ -19,7 +19,19 @@ The package is based on
 
 ## Description of Physics
 
+* Description of Magnetic Background Field
+* Magnetic Field of Probe Coil
+* Materials and Properties
+* NMR Probe
+* Bloch-Equations
+* RF Pulses
+* Free Induction Decay
+* Noise
+* Signal Artefacts (baseline / distortions)
+
 ## Description of Simulation principle
+
+## Analysis Strategies
 
 ## Examples
 
