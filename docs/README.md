@@ -1,4 +1,4 @@
-# Goal of the Package
+# General Description
 
 The repository contains scripts to generate simulations of pulsed Nuclear Magnetic Resonance (pNMR) free induction decay (FID) signals.
 
@@ -19,6 +19,8 @@ The package is based on
 
 ## Description of Physics
 
+Overview of pulsed NMR.
+
 * Description of Magnetic Background Field
 * Magnetic Field of Probe Coil
 * Materials and Properties
@@ -26,10 +28,12 @@ The package is based on
 * Bloch-Equations
 * RF Pulses
 * Free Induction Decay
+* Pulsed NMR sequences
+* Spin Echo
 * Noise
 * Signal Artefacts (baseline / distortions)
 
-## Description of Simulation principle
+## Simulation Principle
 
 ## Analysis Strategies
 
@@ -42,3 +46,7 @@ The package is based on
 ## ToDo List
 
 see [the ToDo List](ToDoList.md)
+
+##  References
+[scipy] www.scipy.org
+[numericalunits] www.github.com/numericalunits
