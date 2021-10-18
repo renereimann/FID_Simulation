@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy import integrate
+from scipy.special import ellipk, ellipe
 from ..units import *
 
 class Coil(object):
@@ -25,6 +26,38 @@ class Coil(object):
         self.use_biot_savart = use_biot_savart
 
     def B_field(self, x, y, z):
+        if self.use_biot_savart:
+            return self.B_field_biot_savart(x,y,z)
+        else:
+            return self.B_field_multi_loop(x,y,z)
+
+    def B_field_multi_loop(self, x, y, z):
+        rho = np.sqrt(x*x+y*y)
+        Brho, Bz = None, None
+        for dz in np.linspace(-self.length/2, self.length/2, int(self.turns)):
+            this_B_rho, this_B_z = self.B_field_single_loop(rho, z+dz)
+            if Brho is None:
+                Brho = this_B_rho
+                Bz = this_B_z
+            else:
+                Brho += this_B_rho
+                Bz += this_B_z
+
+        return Brho*x/rho, Brho*y/rho, Bz
+
+    def B_field_single_loop(self, rho, z):
+        a=self.radius
+        z2 = z*z
+        K = (a+rho)*(a+rho)+z2
+        ellipeK = ellipe(K)
+        ellipkK = ellipk(K)
+        denom = (a-rho)*(a-rho)+z2
+        pre = self.current*mu0/2/np.pi/np.sqrt(K)
+        Bz = pre*( ellipeK*(a*a-rho*rho-z2)/denom+ellipkK)
+        Brho = pre*z/rho*( ellipeK*(a*a+rho*rho+z2)/denom+ellipkK)
+        return Brho, Bz
+
+    def B_field_biot_savart(self, x, y, z):
         r"""The magnetic field of the coil
         Assume Biot-Savart law
         vec(B)(vec(r)) = µ0 / 4π ∮ I dvec(L) × vec(r)' / |vec(r)'|³
