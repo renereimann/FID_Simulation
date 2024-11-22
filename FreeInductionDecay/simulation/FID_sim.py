@@ -81,7 +81,8 @@ class FID_simulation(object):
         self.cells_B0 = np.sqrt(np.sum(B0**2, axis=-1))
 
         # calculate coil field at cell
-        B1 = np.array([self.probe.coil.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
+        #B1 = np.array([self.probe.coil.B_field(x, y, z) for x, y, z in zip(self.cells_x, self.cells_y, self.cells_z)])
+        B1 = self.probe.coil.B_field(self.cells_x, self.cells_y, self.cells_z)
         self.cells_B1_x = B1[:,0]
         self.cells_B1_y = B1[:,1]
         self.cells_B1_z = B1[:,2]

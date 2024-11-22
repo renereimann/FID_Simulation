@@ -4,6 +4,7 @@ import numpy as np
 from scipy import integrate
 from scipy.special import ellipk, ellipe
 from ..units import *
+import magpylib as magpy
 
 class Coil(object):
     r"""A coil parametrized by number of turns, length, diameter and current.
@@ -24,12 +25,32 @@ class Coil(object):
         self.radius = diameter/2.
         self.current = current
         self.use_biot_savart = use_biot_savart
+        
+        self.setup_coil()
+        
+    def setup_coil(self):
+        self._coil = magpy.Collection()
+        for dz in np.linspace(-self.length/2, self.length/2, int(self.turns)):
+            self._coil.addSources( magpy.source.current.Circular(curr=self.current/A, dim=2*self.radius/m, pos=(0,0,dz/m)) )
+
+    def B_field_single_loop(self, rho, z):
+        a=self.radius
+        z2 = z*z
+        K = (a+rho)*(a+rho)+z2
+        ellipeK = ellipe(K)
+        ellipkK = ellipk(K)
+        denom = (a-rho)*(a-rho)+z2
+        pre = self.current*mu0/2/np.pi/np.sqrt(K)
+        Bz = pre*( ellipeK*(a*a-rho*rho-z2)/denom+ellipkK)
+        Brho = pre*z/rho*( ellipeK*(a*a+rho*rho+z2)/denom+ellipkK)
+        return Brho, Bz
+        
 
     def B_field(self, x, y, z):
         if self.use_biot_savart:
             return self.B_field_biot_savart(x,y,z)
         else:
-            return self.B_field_multi_loop(x,y,z)
+            return self._coil.getB(np.array([x/m,y/m,z/m]).T)*T
 
     def B_field_multi_loop(self, x, y, z):
         rho = np.sqrt(x*x+y*y)
